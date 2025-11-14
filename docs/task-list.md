@@ -206,7 +206,7 @@ Critical component requiring careful implementation of state transition rules an
 ---
 pr_id: PR-003a
 title: Translate Picatrix Prompts to Lemegeton Architecture
-cold_state: new
+cold_state: completed
 priority: high
 complexity:
   score: 4
@@ -215,40 +215,111 @@ complexity:
   rationale: Requires understanding both systems and careful translation
 dependencies: [PR-002]
 estimated_files:
-  - path: src/prompts/commitPolicy.ts
+  - path: prompts/agent-defaults.yml
     action: create
-    description: adapted commit policy for hot/cold states
-  - path: src/prompts/qcGuidelines.ts
+    description: core coordination workflow with Redis, hot/cold states, coding standards
+  - path: prompts/commit-policy.yml
     action: create
-    description: QC agent guidelines with incremental testing
-  - path: src/prompts/memoryBank.ts
+    description: commit rules with hot/cold state distinction
+  - path: prompts/cost-guidelines.yml
     action: create
-    description: memory bank for team rotation
-  - path: src/prompts/codingStandards.ts
+    description: cost control and model tier routing
+  - path: prompts/planning-agent.yml
     action: create
-    description: coding standards and limits
-  - path: src/prompts/costGuidelines.ts
+    description: planning agent guide for PRD and task list generation
+  - path: src/types/prompts.ts
     action: create
-    description: cost control and model selection
+    description: TypeScript interfaces for all prompt types
+  - path: src/services/PromptLoader.ts
+    action: create
+    description: service to load YAML prompts and cache in Redis
+  - path: src/services/__tests__/PromptLoader.test.ts
+    action: create
+    description: comprehensive test suite for prompt loading
   - path: docs/prompts/README.md
     action: create
-    description: prompt system documentation
+    description: prompt system architecture and usage documentation
+  - path: src/cli/index.ts
+    action: create
+    description: CLI entry point for prompt access
+  - path: src/cli/commands/prompt.ts
+    action: create
+    description: prompt CLI commands (get, list)
+  - path: bin/lemegeton
+    action: modify
+    description: route to CLI implementation
 ---
 
 **Description:**
-Translate valuable Picatrix prompts to Lemegeton conventions, including PR implementation planning prompts, removing file-based coordination in favor of Redis, adapting to hot/cold state model, and integrating new features like cost control and speculative execution.
+Translate valuable Picatrix prompts to Lemegeton conventions with YAML format, removing file-based coordination in favor of Redis, adapting to hot/cold state model, and integrating new features like cost control. Implemented CLI-based prompt access to solve node_modules gitignore problem.
 
 **Acceptance Criteria:**
-- [ ] PR implementation planning prompts translated from Picatrix agent-planning.md
-- [ ] Commit policy adapted to hot/cold state transitions
-- [ ] QC guidelines include incremental testing
-- [ ] Memory bank supports team rotation
-- [ ] Coding standards enforced programmatically
-- [ ] Cost guidelines integrated with heterogeneous pools
-- [ ] All prompts accessible to agents via Hub
+- [x] Planning agent prompts translated from Picatrix
+- [x] Commit policy adapted to hot/cold state transitions
+- [x] Coding standards integrated into agent-defaults (75 lines/function, 750/file)
+- [x] Cost guidelines created for heterogeneous pools
+- [x] All prompts accessible via CLI (works from node_modules)
+- [x] Prompts cross-reference each other with access instructions
+- [x] YAML format for machine parsing and Redis caching
+- [x] PromptLoader supports hybrid loading (direct + CLI)
 
 **Notes:**
-This establishes the behavioral guidelines for agents while removing Picatrix's file-based coordination limitations. Includes critical PR-level planning prompts that agents use when implementing individual PRs.
+Completed in two commits:
+- PR-003a: Core prompt translation with PromptLoader service
+- PR-003a-fix: CLI-based access solving node_modules gitignore issue + cross-references
+Memory bank deferred to PR-003b for proper MemoryAdapter design.
+
+### PR-003b: Memory Bank with MemoryAdapter
+
+---
+pr_id: PR-003b
+title: Memory Bank with MemoryAdapter Pattern
+cold_state: new
+priority: medium
+complexity:
+  score: 6
+  estimated_minutes: 60
+  suggested_model: sonnet
+  rationale: Adapter pattern design for future vector DB migration
+dependencies: [PR-003a]
+estimated_files:
+  - path: src/adapters/MemoryAdapter.ts
+    action: create
+    description: interface for memory storage (file-based → vector DB migration path)
+  - path: src/adapters/FileMemoryAdapter.ts
+    action: create
+    description: file-based implementation for Phase 0.1a
+  - path: src/memory/MemoryBank.ts
+    action: create
+    description: memory bank service using MemoryAdapter
+  - path: prompts/memory-bank.yml
+    action: create
+    description: memory bank prompt adapted from Picatrix
+  - path: docs/ARCHITECTURE.md
+    action: modify
+    description: document MemoryAdapter pattern for future reference
+  - path: src/types/memory.ts
+    action: create
+    description: memory bank type definitions
+  - path: tests/memory.test.ts
+    action: create
+    description: memory bank and adapter tests
+---
+
+**Description:**
+Implement memory bank system adapted from Picatrix with MemoryAdapter pattern to enable smooth transition from file-based storage (Phase 0.1a) to vector database (Phase 1.0+) for team rotation and institutional knowledge.
+
+**Acceptance Criteria:**
+- [ ] MemoryAdapter interface defined for storage abstraction
+- [ ] FileMemoryAdapter implements file-based storage
+- [ ] Memory bank prompt translated from Picatrix
+- [ ] Supports systemPatterns, techContext, activeContext, progress files
+- [ ] Redis caching for hot access
+- [ ] MemoryAdapter documented in ARCHITECTURE.md for future vector DB work
+- [ ] Tests verify adapter pattern and memory operations
+
+**Notes:**
+Separated from PR-003a to properly design adapter pattern. File-based implementation sufficient for Phase 0.1a, but adapter enables future migration to vector database for smarter context retrieval.
 
 ---
 
