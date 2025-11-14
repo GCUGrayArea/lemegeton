@@ -1300,59 +1300,81 @@ git:
 
 #### Prompt Loading Strategy
 
+**CLI-Based Approach** (Implemented in PR-003a)
+
+Lemegeton uses CLI commands for prompt access to avoid filesystem permission issues with `node_modules/`:
+
+```bash
+# Agents and Hub use these commands to access prompts
+npx lemegeton prompt get agent-defaults
+npx lemegeton prompt get commit-policy
+npx lemegeton prompt list
+```
+
+**Benefits:**
+- Works from `node_modules` (no gitignore issues)
+- No filesystem access needed by agents
+- Version-pinned via package.json
+- Extensible for future override support
+
+**Implementation:**
+
 ```typescript
 class PromptLoader {
-  private packageRoot: string;
-  private projectRoot: string;
-  
-  constructor() {
-    // Package root: where lemegeton is installed
-    this.packageRoot = path.join(__dirname, '../..');
-    
-    // Project root: where user ran lemegeton command
-    this.projectRoot = process.cwd();
-  }
-  
-  async loadPrompt(name: string): Promise<string> {
-    // 1. Check for user override in .lemegeton/prompts/
-    const overridePath = path.join(
-      this.projectRoot,
-      '.lemegeton/prompts',
-      `${name}.md`
-    );
-    
-    if (fs.existsSync(overridePath)) {
-      console.log(`📝 Using custom prompt: ${name}.md`);
-      return fs.readFile(overridePath, 'utf-8');
+  private redis: RedisClient;
+
+  // Hybrid Caching Strategy (PR-003a)
+  async loadAllPrompts(useCLI: boolean = true): Promise<void> {
+    const prompts = ['agent-defaults', 'commit-policy', 'cost-guidelines', 'planning-agent'];
+
+    for (const promptName of prompts) {
+      if (useCLI) {
+        await this.loadPromptViaCLI(promptName);
+      } else {
+        await this.loadPrompt(promptName); // Direct filesystem (development)
+      }
     }
-    
-    // 2. Fall back to default in package
-    const defaultPath = path.join(
-      this.packageRoot,
-      'prompts',
-      `${name}.md`
-    );
-    
-    if (fs.existsSync(defaultPath)) {
-      console.log(`📝 Using default prompt: ${name}.md`);
-      return fs.readFile(defaultPath, 'utf-8');
+  }
+
+  async loadPromptViaCLI(name: string): Promise<void> {
+    // Call CLI to get prompt content
+    const command = `npx lemegeton prompt get ${name}`;
+    const content = execSync(command, { encoding: 'utf8' });
+
+    // Parse YAML
+    const parsed = yaml.load(content) as Prompt;
+
+    // Validate and cache in Redis
+    this.validatePrompt(parsed, name);
+    await this.redis.set(`prompt:${name}`, JSON.stringify(parsed));
+  }
+
+  // Agents query Redis cache via Hub API
+  async getPrompt(name: string): Promise<Prompt> {
+    const cached = await this.redis.get(`prompt:${name}`);
+    if (!cached) {
+      throw new Error(`Prompt not found in cache: ${name}`);
     }
-    
-    throw new Error(`Prompt not found: ${name}.md`);
+    return JSON.parse(cached);
   }
-  
-  async listAvailablePrompts(): Promise<string[]> {
-    const defaultPrompts = await fs.readdir(
-      path.join(this.packageRoot, 'prompts')
-    );
-    
-    const overrideDir = path.join(this.projectRoot, '.lemegeton/prompts');
-    const overridePrompts = fs.existsSync(overrideDir)
-      ? await fs.readdir(overrideDir)
-      : [];
-    
-    return [...new Set([...defaultPrompts, ...overridePrompts])];
+}
+```
+
+**Future Enhancement - User Overrides:**
+
+```typescript
+// Planned for Phase 1.0+
+async loadPrompt(name: string): Promise<string> {
+  // 1. Check for user override in .lemegeton/prompts/
+  const overridePath = path.join(process.cwd(), '.lemegeton/prompts', `${name}.yml`);
+
+  if (fs.existsSync(overridePath)) {
+    console.log(`📝 Using custom prompt: ${name}.yml`);
+    return fs.readFile(overridePath, 'utf-8');
   }
+
+  // 2. Fall back to bundled prompt via CLI
+  return execSync(`npx lemegeton prompt get ${name}`, { encoding: 'utf8' });
 }
 ```
 

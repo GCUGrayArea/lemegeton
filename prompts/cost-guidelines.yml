@@ -2,6 +2,15 @@ name: cost-guidelines
 version: "1.0"
 description: Cost control and model selection guidelines for heterogeneous agent pools, enabling intelligent routing based on PR complexity and budget enforcement.
 
+# Related Prompts
+relatedPrompts: |
+  For cost-aware development:
+  - planning-agent: Uses these guidelines to score PR complexity
+  - agent-defaults: All agents should understand their assigned tier
+
+  Access via: npx lemegeton prompt get <prompt-name>
+  Or query Hub cache: GET prompt:<prompt-name>
+
 # Model Tier Routing
 # Route PRs to appropriate models based on complexity score
 modelRouting:

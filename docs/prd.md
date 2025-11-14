@@ -566,6 +566,10 @@ class ComplexityScorer {
 - Federated hubs
 - Vector database for dynamic memory
 - ML-based scheduling optimization
+- **Prompt format optimizations**:
+  - JSON format support (`npx lemegeton prompt get --format json`) for faster parsing
+  - TOON format support (`npx lemegeton prompt get --format toon`) for ultra-compact transmission
+  - Rationale: YAML human-readable for development, JSON for fast parsing, TOON for optimized network transmission
 
 ---
 

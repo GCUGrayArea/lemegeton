@@ -2,6 +2,28 @@ name: agent-defaults
 version: "1.0"
 description: Core coordination workflow for Lemegeton agents, including work claiming, state management, Redis coordination, and coding standards.
 
+# Accessing Other Prompts
+# How to reference other guidance documents
+promptAccess: |
+  When you need to reference other prompts (commit-policy, cost-guidelines, etc.):
+
+  1. **Check Hub cache first** (fastest):
+     - Most prompts are pre-loaded in Redis by Hub on startup
+     - Query via Hub API: GET prompt:<prompt-name>
+
+  2. **Use CLI if not cached** (fallback):
+     - npx lemegeton prompt get commit-policy
+     - npx lemegeton prompt get cost-guidelines
+     - Works from node_modules, no filesystem access needed
+
+  Key prompts you should be aware of:
+  - commit-policy: When and how to commit changes (critical!)
+  - cost-guidelines: Model selection and budget limits
+  - planning-agent: How Planning Agent structures PRs
+
+  IMPORTANT: Always follow commit-policy for git operations. Reference it
+  before making commits to ensure you're following the correct workflow.
+
 # Work Claiming Process
 # How agents discover and claim available work
 workClaiming:

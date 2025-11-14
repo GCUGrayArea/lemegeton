@@ -8,6 +8,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as yaml from 'js-yaml';
+import { execSync } from 'child_process';
 import { createClient } from 'redis';
 import type { RedisClientType } from 'redis';
 import {
@@ -47,9 +48,10 @@ export class PromptLoader {
    * Loads all prompts from disk and caches them in Redis.
    * Called during Hub startup.
    *
+   * @param useCLI - If true, use CLI commands to load prompts (recommended for production)
    * @throws Error if any prompt fails to load or validate
    */
-  async loadAllPrompts(): Promise<void> {
+  async loadAllPrompts(useCLI: boolean = false): Promise<void> {
     const prompts = [
       PromptName.AgentDefaults,
       PromptName.CommitPolicy,
@@ -58,7 +60,7 @@ export class PromptLoader {
     ];
 
     for (const promptName of prompts) {
-      await this.loadPrompt(promptName);
+      await this.loadPrompt(promptName, useCLI);
     }
   }
 
@@ -66,9 +68,15 @@ export class PromptLoader {
    * Loads a specific prompt from disk and caches it in Redis.
    *
    * @param promptName - Name of the prompt to load
+   * @param useCLI - If true, use CLI command instead of direct filesystem access
    * @throws Error if prompt file doesn't exist or is invalid
    */
-  async loadPrompt(promptName: PromptName): Promise<void> {
+  async loadPrompt(promptName: PromptName, useCLI: boolean = false): Promise<void> {
+    if (useCLI) {
+      await this.loadPromptViaCLI(promptName);
+      return;
+    }
+
     const filePath = this.getPromptPath(promptName);
 
     // Check if file exists
@@ -86,6 +94,41 @@ export class PromptLoader {
     // Cache in Redis
     const key = this.getRedisKey(promptName);
     await this.redis.set(key, JSON.stringify(parsed));
+  }
+
+  /**
+   * Loads a prompt via CLI command (works from node_modules).
+   * This method is preferred when running as an installed package,
+   * as it avoids needing filesystem access to node_modules.
+   *
+   * @param promptName - Name of the prompt to load
+   * @throws Error if CLI command fails or prompt is invalid
+   */
+  async loadPromptViaCLI(promptName: PromptName): Promise<void> {
+    try {
+      // Call lemegeton CLI to get the prompt
+      // This works even from node_modules because the CLI is in the package
+      const command = `npx lemegeton prompt get ${promptName}`;
+      const fileContent = execSync(command, {
+        encoding: 'utf8',
+        stdio: ['pipe', 'pipe', 'pipe'], // Capture stdout, suppress stderr unless error
+      });
+
+      // Parse YAML
+      const parsed = yaml.load(fileContent) as Prompt;
+
+      // Validate prompt structure
+      this.validatePrompt(parsed, promptName);
+
+      // Cache in Redis
+      const key = this.getRedisKey(promptName);
+      await this.redis.set(key, JSON.stringify(parsed));
+    } catch (error) {
+      if (error instanceof Error) {
+        throw new Error(`Failed to load prompt via CLI: ${error.message}`);
+      }
+      throw error;
+    }
   }
 
   /**

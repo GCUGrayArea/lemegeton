@@ -24,20 +24,46 @@ User's project:
     └── prompts/               # User overrides (future feature)
 ```
 
-### Loading Flow
+### Loading Flow (CLI-Based)
 
-1. **Hub Startup**: Hub calls `PromptLoader.loadAllPrompts()`
-2. **File Read**: PromptLoader reads YAML files from `prompts/` directory
-3. **Parse & Validate**: YAML parsed and validated against TypeScript schemas
-4. **Cache in Redis**: Parsed prompts stored as JSON in Redis with keys `prompt:<name>`
-5. **Agent Access**: Agents retrieve prompts from Redis cache via `PromptLoader.getPrompt()`
+**PR-003a-fix:** Prompts are accessed via CLI commands to avoid `node_modules` filesystem issues:
 
-### Why Redis Cache?
+1. **Hub Startup**: Hub calls `PromptLoader.loadAllPrompts(useCLI: true)`
+2. **CLI Command**: For each prompt, executes `npx lemegeton prompt get <name>`
+3. **CLI reads**: CLI reads YAML from bundled `prompts/` directory (works from node_modules)
+4. **YAML Output**: CLI outputs raw YAML to stdout
+5. **Parse & Validate**: PromptLoader parses YAML and validates against TypeScript schemas
+6. **Cache in Redis**: Parsed prompts stored as JSON in Redis with keys `prompt:<name>`
+7. **Agent Access**: Agents retrieve prompts from Redis cache via Hub API
 
-- **Performance**: Sub-millisecond retrieval vs file I/O
-- **Consistency**: All agents see identical prompt content
-- **Hot Reload**: Future feature to update prompts without restarting Hub
-- **Distributed**: Multiple Hub instances can share Redis cache
+### Why CLI-Based Loading?
+
+- **No gitignore issues**: Works from `node_modules/lemegeton/` despite gitignore
+- **No filesystem access needed**: Agents call CLI tools, don't read files
+- **Version-pinned**: Each project's `package.json` pins lemegeton version
+- **Clean abstraction**: Agents don't know where prompts are stored
+- **Cacheable**: Hub caches in Redis for performance
+- **Future-proof**: Easy to add user overrides in `.lemegeton/prompts/`
+
+### CLI Commands
+
+**List available prompts:**
+```bash
+npx lemegeton prompt list
+```
+
+**Get a specific prompt:**
+```bash
+npx lemegeton prompt get agent-defaults
+npx lemegeton prompt get commit-policy
+npx lemegeton prompt get cost-guidelines
+npx lemegeton prompt get planning-agent
+```
+
+**Save prompt to file:**
+```bash
+npx lemegeton prompt get agent-defaults > my-custom-prompt.yml
+```
 
 ## Available Prompts
 

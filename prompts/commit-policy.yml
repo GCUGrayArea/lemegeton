@@ -2,6 +2,15 @@ name: commit-policy
 version: "1.0"
 description: Commit policy for Lemegeton agents, defining when and how to commit changes with distinction between autonomous planning commits and approval-required implementation commits.
 
+# Related Prompts
+relatedPrompts: |
+  Before committing, also consult:
+  - agent-defaults: For coding standards (75-line functions, 750-line files)
+  - cost-guidelines: Understand your model tier and budget implications
+
+  Access via: npx lemegeton prompt get <prompt-name>
+  Or query Hub cache: GET prompt:<prompt-name>
+
 # Git Synchronization
 # Always stay in sync with remote to avoid conflicts
 gitSync:
