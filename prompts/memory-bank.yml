@@ -1,0 +1,443 @@
+name: memory-bank
+version: "1.0"
+description: Memory bank system for persistent institutional knowledge across agent sessions
+
+# Related Prompts
+relatedPrompts: |
+  Memory bank works with other Lemegeton prompts:
+  - agent-defaults: Provides core workflow that memory bank supports
+  - commit-policy: Memory updates should be committed with appropriate messages
+  - planning-agent: Planning commits can update memory bank autonomously
+
+  Access via: npx lemegeton prompt get <prompt-name>
+  Or query Hub cache: GET prompt:<prompt-name>
+
+# Purpose and Overview
+purpose:
+  overview: |
+    The Memory Bank stores institutional knowledge in docs/memory/ to ensure work
+    continuity and prevent repeated discovery cycles. Since agents lack between-session
+    memory, these files accumulate project knowledge for all agents and users.
+
+    Key difference from Picatrix: Lemegeton uses MemoryAdapter pattern enabling
+    future migration from file-based storage (Phase 0.1a) to vector database (Phase 1.0+).
+
+  keyBenefits:
+    - "Prevents knowledge loss between agent sessions"
+    - "Reduces repeated discovery of patterns and decisions"
+    - "Provides context for new agents joining the project"
+    - "Git-tracked institutional knowledge shared across team"
+    - "Enables smooth transition to vector DB without code changes"
+
+# Core Memory Files
+coreFiles:
+  systemPatterns:
+    path: docs/memory/systemPatterns.md
+    purpose: Architectural decisions, design patterns, component relationships
+    updateFrequency: Medium (when patterns discovered or major design decisions made)
+
+    contentGuidelines:
+      - "Document design patterns as discovered, not planned upfront"
+      - "Include rationale for architectural choices"
+      - "Note component relationships and dependencies"
+      - "Track anti-patterns to avoid"
+      - "Reference specific files/components where patterns are used"
+
+    example: |
+      ## Hot/Cold State Pattern
+
+      Lemegeton separates coordination into two state levels:
+      - Hot states: Ephemeral work tracked in Redis only (investigating, in-progress)
+      - Cold states: Durable checkpoints committed to git (ready, completed, approved)
+
+      Rationale: Separates rapid coordination (ephemeral) from milestones (durable).
+      Redis failure doesn't lose critical state, only transient work status.
+
+      Implemented in: src/core/stateMachine.ts
+      Related PRs: PR-003
+
+  techContext:
+    path: docs/memory/techContext.md
+    purpose: Actual technologies, development setup, constraints, integration points
+    updateFrequency: Low (when tech stack changes or integrations added)
+
+    contentGuidelines:
+      - "Document what's actually used (may differ from initial plans)"
+      - "Include version numbers and compatibility notes"
+      - "Note development environment setup and requirements"
+      - "Track external integrations and APIs"
+      - "Document performance characteristics and constraints"
+
+    example: |
+      ## Tech Stack (Actual)
+
+      - TypeScript 5.0+ (strict mode enabled, native decorators)
+      - Redis 7.x (coordination layer, auto-spawned via Docker)
+      - Node.js 18+ (for native fetch support)
+      - YAML parsing via js-yaml (prompt system)
+
+      ## Development Setup
+
+      ```bash
+      npm install
+      npm run build
+      npm test
+      ```
+
+      Redis auto-spawns on Hub start. No manual setup required.
+
+      ## Constraints
+
+      - File leases use Redis MULTI/EXEC for atomicity
+      - 75-line function limit, 750-line file limit enforced
+      - Prompts bundled in NPM package (node_modules/)
+
+  activeContext:
+    path: docs/memory/activeContext.md
+    purpose: Current work focus, recent changes, priorities, blockers
+    updateFrequency: High (start/end of each significant work session)
+
+    contentGuidelines:
+      - "Update at start/end of each significant work session"
+      - "Note current PR focus and blockers"
+      - "Track active decisions and open questions"
+      - "This file changes most frequently - treat as session notes"
+      - "Include dates/timestamps for time-sensitive information"
+
+    example: |
+      ## Current Focus (2025-11-14)
+
+      Implementing PR-003b: Memory Bank with MemoryAdapter pattern
+
+      ### Recent Changes
+      - Completed PR-003a: YAML prompts with CLI access (2 commits)
+      - Fixed node_modules gitignore issue with CLI-based prompt loading
+      - Added cross-references between prompts
+
+      ### Active Decisions
+      - Using adapter pattern to enable future vector DB migration
+      - File-based storage sufficient for Phase 0.1a
+      - Redis caching with 1-hour TTL for hot access
+
+      ### Blockers
+      - None currently
+
+      ### Next Steps
+      - Complete memory bank implementation
+      - Write comprehensive tests
+      - Update ARCHITECTURE.md with adapter pattern docs
+
+  progress:
+    path: docs/memory/progress.md
+    purpose: What works vs. planned, remaining work, feature status, technical debt
+    updateFrequency: Medium (when PRs complete or major milestones reached)
+
+    contentGuidelines:
+      - "Track completed vs. remaining PRs from task-list.md"
+      - "Note working features and known limitations"
+      - "Document technical debt for future refactoring"
+      - "Update when PRs transition to completed"
+      - "Include test coverage status"
+
+    example: |
+      ## Completed Features
+
+      - ✅ PR-001: Project scaffolding and TypeScript setup
+      - ✅ PR-002: Core data models and interfaces
+      - ✅ PR-003: State machine implementation (structural only)
+      - ✅ PR-003a: YAML prompts with CLI access and Redis caching
+
+      ## In Progress
+
+      - 🔄 PR-003b: Memory bank with MemoryAdapter pattern (current)
+
+      ## Remaining (High Priority)
+
+      - PR-004: Redis connection management
+      - PR-005: File lease acquisition
+      - PR-006: Coordination mode manager
+      - PR-007: Hub daemon process
+
+      ## Technical Debt
+
+      - State machine has structural implementation only (business logic deferred to Hub)
+      - CLI prompt access tested manually (automated tests needed)
+      - Memory bank needs vector DB adapter stub for future migration
+
+      ## Test Coverage
+
+      - Core models: >90% coverage
+      - State machine: >85% coverage
+      - Prompts: Manual testing only (needs automation)
+
+# Reading Order for Agents
+readingOrder:
+  description: "Agents should read memory files in this sequence at session start"
+
+  sequence:
+    - file: docs/prd.md
+      purpose: Project foundation, requirements, and success criteria
+      priority: critical
+
+    - file: docs/task-list.md
+      purpose: Work coordination, dependencies, and PR status
+      priority: critical
+
+    - file: docs/memory/systemPatterns.md
+      purpose: Architectural decisions and design patterns
+      priority: high
+
+    - file: docs/memory/techContext.md
+      purpose: Technology stack, setup, and constraints
+      priority: high
+
+    - file: docs/memory/activeContext.md
+      purpose: Current work focus and immediate priorities
+      priority: critical
+
+    - file: docs/memory/progress.md
+      purpose: Status of completed and remaining work
+      priority: high
+
+  rationale: |
+    This sequence provides context from foundation → current state:
+    1. PRD: Why we're building this
+    2. Task list: What work exists and dependencies
+    3. System patterns: How we're building it (architecture)
+    4. Tech context: What tools we're using
+    5. Active context: What's happening right now
+    6. Progress: What's done vs. remaining
+
+# Update Triggers
+updateTriggers:
+  description: "Memory bank should be updated when these events occur"
+
+  triggers:
+    - event: discovered_new_pattern
+      files: [systemPatterns]
+      example: "Found that hot/cold state separation prevents coordination bugs"
+      autonomous: true
+      notes: "Document immediately so other agents benefit"
+
+    - event: implemented_major_change
+      files: [progress, activeContext]
+      example: "Completed state machine implementation"
+      autonomous: false
+      notes: "Update when PR transitions to completed (bundled with code commit)"
+
+    - event: clarified_context
+      files: [techContext, activeContext]
+      example: "Confirmed TypeScript 5.0+ requirement for native decorators"
+      autonomous: true
+      notes: "Prevents future confusion about tech choices"
+
+    - event: pr_complete
+      files: [progress, activeContext]
+      example: "Mark PR-003a complete, update active focus to PR-003b"
+      autonomous: false
+      notes: "Bundle with implementation commit per commit-policy"
+
+    - event: user_requested
+      files: [any]
+      example: "User: 'Update memory bank with today's discoveries'"
+      autonomous: false
+      notes: "Explicit user request always triggers update"
+
+    - event: architectural_decision
+      files: [systemPatterns, techContext]
+      example: "Decided to use adapter pattern for memory bank storage"
+      autonomous: true
+      notes: "Critical for maintaining design consistency"
+
+    - event: blocker_discovered
+      files: [activeContext]
+      example: "Redis connection pool exhaustion under load"
+      autonomous: true
+      notes: "Document blockers immediately for visibility"
+
+# Update Process
+updateProcess:
+  guidelines:
+    - "Read all four memory files first to understand current state"
+    - "Update only files that have new information"
+    - "Preserve existing content, add or refine (don't rewrite from scratch)"
+    - "Use markdown formatting (headers, lists, code blocks)"
+    - "Include dates/timestamps for context-sensitive information"
+    - "Commit memory updates with descriptive message"
+
+  commitRules:
+    planning: "Planning Agent can commit memory updates autonomously"
+    implementation: "Implementation agents bundle memory updates with code commits"
+    format: "[Agent] Update memory bank - <brief description>"
+
+  exampleWorkflow: |
+    1. Agent discovers new pattern during PR implementation
+    2. Agent checks if pattern already documented in systemPatterns.md
+    3. If new, agent appends section to systemPatterns.md
+    4. Agent updates activeContext.md with current work status
+    5. Planning Agent commits autonomously: "[Planning] Update memory - hot/cold state pattern"
+    6. Implementation Agent bundles with code: "[Blue Agent] PR-042: Implement feature with memory updates"
+
+  avoidance:
+    - "Don't duplicate information across multiple files"
+    - "Don't overwrite existing content without reading first"
+    - "Don't defer updates (memory gaps accumulate quickly)"
+    - "Don't write vague notes ('Fixed stuff' → 'Fixed Redis connection pooling')"
+
+# Key Principles
+keyPrinciples:
+  aiOptimized: |
+    Memory files prioritize context efficiency over human readability.
+    Dense, structured content preferred. Examples and code snippets valuable.
+    Think: "What would I want to know if I joined this project today?"
+
+  committedToRepo: |
+    All memory files tracked in git. Benefits entire team, not just one developer.
+    Memory bank is part of the project's living documentation.
+
+  noRuleModifications: |
+    Agents READ prompts/ files but cannot WRITE them.
+    Suggested prompt changes flow to users for manual implementation.
+    Memory files are for project-specific knowledge, not governance changes.
+
+  accumulationOverReset: |
+    Project knowledge accumulates rather than evaporating between sessions.
+    New agents benefit from previous agents' discoveries.
+    This is the core value proposition of the memory bank.
+
+  adapterPattern: |
+    Lemegeton uses MemoryAdapter pattern for storage abstraction:
+    - Phase 0.1a: FileMemoryAdapter (docs/memory/)
+    - Phase 1.0+: VectorMemoryAdapter (semantic search)
+
+    Consumer code (MemoryBank service) unchanged by migration.
+
+# Integration with Lemegeton
+integrationWithLemegeton:
+  hubUsage: |
+    Hub can query memory bank when:
+    - Planning agent needs architectural context
+    - Code review agent checks for pattern consistency
+    - Agents ask for project history or decisions
+    - Session starts (load context)
+
+    Hub loads prompts via PromptLoader service, which caches in Redis.
+
+  agentUsage: |
+    Agents read memory bank:
+    - At session start (context loading per readingOrder)
+    - Before architectural decisions
+    - When encountering unclear requirements
+    - After major discoveries (to check if already documented)
+
+    Agents write memory bank:
+    - When update triggers occur (see updateTriggers)
+    - Following commit-policy rules (autonomous vs. bundled)
+    - With descriptive commit messages
+
+  redisCaching: |
+    Memory bank service caches files in Redis (1 hour TTL) for fast access:
+
+    Read flow:
+    1. Check Redis: GET memory:systemPatterns
+    2. If hit, return cached content
+    3. If miss, read from adapter (filesystem or vector DB)
+    4. Cache result: SETEX memory:systemPatterns 3600 <content>
+
+    Write flow:
+    1. Write to adapter (durable storage)
+    2. Invalidate cache: DEL memory:systemPatterns
+    3. Update cache: SETEX memory:systemPatterns 3600 <new-content>
+
+    This enables fast access without repeated file I/O or vector DB queries.
+
+# Future: Vector Database Migration
+vectorDBMigration:
+  overview: |
+    Phase 1.0+ will introduce VectorMemoryAdapter for semantic search.
+
+    Benefits:
+    - Semantic similarity search vs. keyword matching
+    - Relevance rankings for query results
+    - Better retrieval for complex questions
+    - Team rotation support (find related context)
+
+    No consumer code changes required (adapter pattern FTW).
+
+  queryExamples:
+    fileAdapter: |
+      // Simple keyword matching
+      query("state machine pattern")
+      // Returns files containing "state", "machine", or "pattern"
+
+    vectorAdapter: |
+      // Semantic similarity search
+      query("how does coordination work between agents?")
+      // Returns relevant sections even without exact keyword matches
+      // Ranked by semantic relevance
+
+  implementation: |
+    VectorMemoryAdapter stub exists for Phase 1.0+.
+    Implementation deferred until vector DB provider chosen (ChromaDB, Pinecone, etc.).
+
+    When implementing:
+    1. Add embedding generation (OpenAI, sentence-transformers, etc.)
+    2. Store embeddings in vector DB
+    3. Implement semantic query with k-NN search
+    4. Maintain file-based fallback for writes
+    5. Same MemoryAdapter interface - no consumer changes
+
+# API Reference
+apiReference:
+  memoryBankService: |
+    High-level service using MemoryAdapter:
+
+    // Read single file (Redis cached)
+    const content = await memoryBank.read(MemoryFile.SystemPatterns);
+
+    // Write single file (cache invalidation)
+    await memoryBank.write(MemoryFile.Progress, updatedContent);
+
+    // Read all files (session start)
+    const snapshot = await memoryBank.readAll();
+
+    // Query memory (keyword or semantic)
+    const results = await memoryBank.query("state machine", {
+      fileFilter: [MemoryFile.SystemPatterns],
+      k: 3
+    });
+
+    // Check if update needed
+    const shouldUpdate = memoryBank.shouldUpdate({
+      discoveredNewPattern: true,
+      implementedMajorChange: false,
+      needsClarification: false,
+      prComplete: false,
+      userRequested: false,
+    });
+
+  fileMemoryAdapter: |
+    File-based implementation (Phase 0.1a):
+
+    const adapter = new FileMemoryAdapter(projectRoot);
+    const memoryBank = new MemoryBank(adapter, redisClient);
+
+    // Files stored at docs/memory/*.md
+    // Atomic writes (temp file + rename)
+    // Default templates for missing files
+    // Simple keyword-based queries
+
+  vectorMemoryAdapter: |
+    Vector DB implementation (Phase 1.0+, stub only):
+
+    const adapter = new VectorMemoryAdapter({
+      provider: 'chromadb',
+      endpoint: 'http://localhost:8000',
+      collectionName: 'lemegeton-memory',
+      embeddingModel: 'openai',
+      embeddingDimensions: 1536,
+    });
+    const memoryBank = new MemoryBank(adapter, redisClient);
+
+    // Semantic queries with relevance scores
+    // Same API, different storage backend

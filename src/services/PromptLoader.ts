@@ -18,6 +18,7 @@ import {
   CommitPolicyPrompt,
   CostGuidelinesPrompt,
   PlanningAgentPrompt,
+  MemoryBankPrompt,
 } from '../types/prompts';
 
 /**

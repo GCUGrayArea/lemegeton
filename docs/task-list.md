@@ -274,7 +274,7 @@ Memory bank deferred to PR-003b for proper MemoryAdapter design.
 ---
 pr_id: PR-003b
 title: Memory Bank with MemoryAdapter Pattern
-cold_state: new
+cold_state: completed
 priority: medium
 complexity:
   score: 6
@@ -282,44 +282,60 @@ complexity:
   suggested_model: sonnet
   rationale: Adapter pattern design for future vector DB migration
 dependencies: [PR-003a]
-estimated_files:
-  - path: src/adapters/MemoryAdapter.ts
-    action: create
-    description: interface for memory storage (file-based → vector DB migration path)
-  - path: src/adapters/FileMemoryAdapter.ts
-    action: create
-    description: file-based implementation for Phase 0.1a
-  - path: src/memory/MemoryBank.ts
-    action: create
-    description: memory bank service using MemoryAdapter
-  - path: prompts/memory-bank.yml
-    action: create
-    description: memory bank prompt adapted from Picatrix
-  - path: docs/ARCHITECTURE.md
-    action: modify
-    description: document MemoryAdapter pattern for future reference
+actual_files:
   - path: src/types/memory.ts
     action: create
-    description: memory bank type definitions
+    description: TypeScript interfaces for memory adapter, files, snapshots, queries
+  - path: src/adapters/FileMemoryAdapter.ts
+    action: create
+    description: file-based implementation with atomic writes and keyword queries
+  - path: src/adapters/VectorMemoryAdapter.ts
+    action: create
+    description: stub for Phase 1.0+ vector DB implementation
+  - path: src/memory/MemoryBank.ts
+    action: create
+    description: memory bank service with Redis caching and adapter injection
+  - path: prompts/memory-bank.yml
+    action: create
+    description: comprehensive memory bank prompt adapted from Picatrix
   - path: tests/memory.test.ts
     action: create
-    description: memory bank and adapter tests
+    description: comprehensive test suite (28 tests, all passing)
+  - path: src/types/prompts.ts
+    action: modify
+    description: added MemoryBank to PromptName enum and MemoryBankPrompt interface
+  - path: src/services/PromptLoader.ts
+    action: modify
+    description: added MemoryBankPrompt import
+  - path: docs/ARCHITECTURE.md
+    action: modify
+    description: added Memory Adapter section with migration path documentation
 ---
 
 **Description:**
 Implement memory bank system adapted from Picatrix with MemoryAdapter pattern to enable smooth transition from file-based storage (Phase 0.1a) to vector database (Phase 1.0+) for team rotation and institutional knowledge.
 
 **Acceptance Criteria:**
-- [ ] MemoryAdapter interface defined for storage abstraction
-- [ ] FileMemoryAdapter implements file-based storage
-- [ ] Memory bank prompt translated from Picatrix
-- [ ] Supports systemPatterns, techContext, activeContext, progress files
-- [ ] Redis caching for hot access
-- [ ] MemoryAdapter documented in ARCHITECTURE.md for future vector DB work
-- [ ] Tests verify adapter pattern and memory operations
+- [x] MemoryAdapter interface defined for storage abstraction
+- [x] FileMemoryAdapter implements file-based storage with atomic writes
+- [x] Memory bank prompt translated from Picatrix (comprehensive YAML)
+- [x] Supports systemPatterns, techContext, activeContext, progress files
+- [x] Redis caching for hot access (1-hour TTL with cache invalidation)
+- [x] MemoryAdapter documented in ARCHITECTURE.md for future vector DB work
+- [x] Tests verify adapter pattern and memory operations (28 tests passing)
+- [x] VectorMemoryAdapter stub created for Phase 1.0+
+- [x] Default content templates for empty memory files
+- [x] Update trigger logic and recommended file updates
 
-**Notes:**
-Separated from PR-003a to properly design adapter pattern. File-based implementation sufficient for Phase 0.1a, but adapter enables future migration to vector database for smarter context retrieval.
+**Implementation Notes:**
+- FileMemoryAdapter stores files at `docs/memory/*.md` for git tracking
+- Atomic writes use temp file + rename pattern to prevent corruption
+- Simple keyword-based queries sufficient for Phase 0.1a
+- MemoryBank service provides Redis caching layer (1-hour TTL)
+- VectorMemoryAdapter stub throws "not implemented" errors with clear guidance
+- Update trigger logic from Picatrix memory bank adapted for Lemegeton coordination
+- Comprehensive test suite covers all core functionality
+- Build successful, all 28 tests passing
 
 ---
 

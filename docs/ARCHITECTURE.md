@@ -1064,6 +1064,185 @@ class NxTestAdapter implements TestAdapter {
 }
 ```
 
+### Memory Adapter
+
+The Memory Adapter pattern enables smooth migration from file-based to vector database storage for the memory bank system.
+
+```typescript
+interface MemoryAdapter {
+  // Basic CRUD operations
+  read(file: MemoryFile): Promise<string>;
+  write(file: MemoryFile, content: string): Promise<void>;
+  exists(file: MemoryFile): Promise<boolean>;
+
+  // Batch operations
+  readAll(): Promise<MemoryBankSnapshot>;
+  writeAll(snapshot: MemoryBankSnapshot): Promise<void>;
+
+  // Query capabilities (simple for file-based, semantic for vector DB)
+  query(question: string, options?: QueryOptions): Promise<MemoryQueryResult[]>;
+}
+```
+
+**Phase 0.1a-0.3: FileMemoryAdapter**
+
+```typescript
+class FileMemoryAdapter implements MemoryAdapter {
+  private baseDir: string;
+  private fileMap: Map<MemoryFile, string> = new Map([
+    [MemoryFile.SystemPatterns, 'docs/memory/systemPatterns.md'],
+    [MemoryFile.TechContext, 'docs/memory/techContext.md'],
+    [MemoryFile.ActiveContext, 'docs/memory/activeContext.md'],
+    [MemoryFile.Progress, 'docs/memory/progress.md'],
+  ]);
+
+  async read(file: MemoryFile): Promise<string> {
+    const filePath = this.getFilePath(file);
+    try {
+      return await fs.readFile(filePath, 'utf8');
+    } catch (error) {
+      // Return default template if file doesn't exist
+      return this.getDefaultContent(file);
+    }
+  }
+
+  async write(file: MemoryFile, content: string): Promise<void> {
+    const filePath = this.getFilePath(file);
+
+    // Atomic write: temp file + rename
+    const tempPath = `${filePath}.tmp`;
+    await fs.writeFile(tempPath, content, 'utf8');
+    await fs.rename(tempPath, filePath);
+  }
+
+  async query(question: string, options?: QueryOptions): Promise<MemoryQueryResult[]> {
+    // Simple keyword matching
+    // More sophisticated search can be added later
+    const files = options?.fileFilter || [all memory files];
+    const results: MemoryQueryResult[] = [];
+
+    for (const file of files) {
+      const content = await this.read(file);
+      if (this.matchesQuery(content, question)) {
+        results.push({
+          file,
+          content,
+          excerpt: this.extractExcerpt(content, question),
+        });
+      }
+    }
+
+    return results;
+  }
+}
+```
+
+**Phase 1.0+: VectorMemoryAdapter**
+
+```typescript
+class VectorMemoryAdapter implements MemoryAdapter {
+  private vectorDB: VectorDBClient; // ChromaDB, Pinecone, Weaviate, etc.
+  private embedder: EmbeddingModel;
+  private fileAdapter: FileMemoryAdapter; // Fallback for writes
+
+  async query(question: string, options?: QueryOptions): Promise<MemoryQueryResult[]> {
+    // 1. Generate embedding for question
+    const embedding = await this.embedder.embed(question);
+
+    // 2. Perform vector similarity search
+    const results = await this.vectorDB.search(embedding, {
+      k: options?.k || 5,
+      filter: options?.fileFilter,
+    });
+
+    // 3. Return ranked results with relevance scores
+    return results.map(result => ({
+      file: result.metadata.file,
+      content: result.text,
+      relevance: result.score,
+      excerpt: this.extractExcerpt(result.text, question),
+    }));
+  }
+
+  // Read/write operations delegate to file adapter for now
+  async read(file: MemoryFile): Promise<string> {
+    return this.fileAdapter.read(file);
+  }
+
+  async write(file: MemoryFile, content: string): Promise<void> {
+    await this.fileAdapter.write(file, content);
+
+    // Also update vector DB with new embeddings
+    const embedding = await this.embedder.embed(content);
+    await this.vectorDB.upsert({
+      id: file,
+      embedding,
+      text: content,
+      metadata: { file },
+    });
+  }
+}
+```
+
+**Benefits of Adapter Pattern:**
+
+- **No consumer code changes**: MemoryBank service uses MemoryAdapter interface, doesn't care about storage backend
+- **Progressive enhancement**: Start with simple file-based storage, migrate to vector DB when needed
+- **Testable**: Same test suite validates both implementations
+- **Query evolution**: Simple keyword search → semantic similarity without API changes
+
+**Memory Bank Service Integration:**
+
+```typescript
+class MemoryBank {
+  private adapter: MemoryAdapter;
+  private redis: RedisClient;
+
+  constructor(adapter: MemoryAdapter, redis: RedisClient) {
+    this.adapter = adapter;
+    this.redis = redis;
+  }
+
+  async read(file: MemoryFile): Promise<string> {
+    // Try Redis cache first
+    const cached = await this.redis.get(`memory:${file}`);
+    if (cached) return cached;
+
+    // Fallback to adapter (file system or vector DB)
+    const content = await this.adapter.read(file);
+
+    // Cache in Redis (1 hour TTL)
+    await this.redis.setex(`memory:${file}`, 3600, content);
+
+    return content;
+  }
+
+  async write(file: MemoryFile, content: string): Promise<void> {
+    // Write to adapter (durable storage)
+    await this.adapter.write(file, content);
+
+    // Invalidate and update cache
+    await this.redis.del(`memory:${file}`);
+    await this.redis.setex(`memory:${file}`, 3600, content);
+  }
+
+  async query(question: string, options?: QueryOptions): Promise<MemoryQueryResult[]> {
+    // Query uses appropriate backend (keyword or semantic)
+    return this.adapter.query(question, options);
+  }
+}
+```
+
+**Migration Path:**
+
+1. **Phase 0.1a**: Use FileMemoryAdapter with simple keyword search
+2. **Phase 0.3**: Enhance file queries with grep-like search
+3. **Phase 1.0**: Implement VectorMemoryAdapter with ChromaDB/Pinecone
+4. **Phase 1.5**: A/B test query quality between keyword and semantic
+5. **Phase 2.0**: Fully migrate to vector DB, keep file adapter for write fallback
+
+The adapter pattern ensures this migration happens transparently to consumers. The MemoryBank service and all agents continue using the same API regardless of storage backend.
+
 ---
 
 ## Security Architecture (Updated)

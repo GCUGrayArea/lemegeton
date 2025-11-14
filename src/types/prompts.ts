@@ -13,6 +13,7 @@ export enum PromptName {
   CommitPolicy = 'commit-policy',
   CostGuidelines = 'cost-guidelines',
   PlanningAgent = 'planning-agent',
+  MemoryBank = 'memory-bank',
 }
 
 /**
@@ -362,9 +363,88 @@ export interface PlanningAgentPrompt extends BasePrompt {
 }
 
 /**
+ * Memory Bank Prompt
+ *
+ * Defines the memory bank system for persistent institutional knowledge:
+ * - Four core files (systemPatterns, techContext, activeContext, progress)
+ * - Update triggers and workflows
+ * - Reading order for agents
+ * - Integration with Lemegeton coordination
+ * - Adapter pattern for future vector DB migration
+ */
+export interface MemoryBankPrompt extends BasePrompt {
+  name: 'memory-bank';
+
+  /** Purpose and overview */
+  purpose: {
+    overview: string;
+    keyBenefits: string[];
+  };
+
+  /** Core memory files */
+  coreFiles: {
+    systemPatterns: any;
+    techContext: any;
+    activeContext: any;
+    progress: any;
+  };
+
+  /** Reading order for agents */
+  readingOrder: {
+    description: string;
+    sequence: any[];
+    rationale: string;
+  };
+
+  /** Update triggers */
+  updateTriggers: {
+    description: string;
+    triggers: any[];
+  };
+
+  /** Update process */
+  updateProcess: {
+    guidelines: string[];
+    commitRules: any;
+    exampleWorkflow: string;
+    avoidance: string[];
+  };
+
+  /** Key principles */
+  keyPrinciples: {
+    aiOptimized: string;
+    committedToRepo: string;
+    noRuleModifications: string;
+    accumulationOverReset: string;
+    adapterPattern: string;
+  };
+
+  /** Integration with Lemegeton */
+  integrationWithLemegeton: {
+    hubUsage: string;
+    agentUsage: string;
+    redisCaching: string;
+  };
+
+  /** Vector DB migration (future) */
+  vectorDBMigration: {
+    overview: string;
+    queryExamples: any;
+    implementation: string;
+  };
+
+  /** API reference */
+  apiReference: {
+    memoryBankService: string;
+    fileMemoryAdapter: string;
+    vectorMemoryAdapter: string;
+  };
+}
+
+/**
  * Union type of all prompt types.
  */
-export type Prompt = AgentDefaultsPrompt | CommitPolicyPrompt | CostGuidelinesPrompt | PlanningAgentPrompt;
+export type Prompt = AgentDefaultsPrompt | CommitPolicyPrompt | CostGuidelinesPrompt | PlanningAgentPrompt | MemoryBankPrompt;
 
 /**
  * Type guard to check if a prompt is AgentDefaultsPrompt.
@@ -392,4 +472,11 @@ export function isCostGuidelinesPrompt(prompt: Prompt): prompt is CostGuidelines
  */
 export function isPlanningAgentPrompt(prompt: Prompt): prompt is PlanningAgentPrompt {
   return prompt.name === 'planning-agent';
+}
+
+/**
+ * Type guard to check if a prompt is MemoryBankPrompt.
+ */
+export function isMemoryBankPrompt(prompt: Prompt): prompt is MemoryBankPrompt {
+  return prompt.name === 'memory-bank';
 }
