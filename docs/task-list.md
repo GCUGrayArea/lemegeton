@@ -48,32 +48,41 @@ dependencies: []
 estimated_files:
   - path: src/index.ts
     action: create
-    description: main entry point
+    description: minimal entry point (version export, type re-exports added by later PRs)
+  - path: bin/lemegeton
+    action: create
+    description: CLI entry point shim (fleshed out in PR-014)
   - path: tsconfig.json
     action: create
-    description: TypeScript configuration
+    description: TypeScript configuration (target ES2020, declaration files)
   - path: package.json
     action: modify
-    description: add core dependencies
+    description: add scripts (build, dev, test, clean), dependencies (redis, dotenv), bin entry
   - path: .npmignore
     action: create
-    description: npm publish configuration
+    description: npm publish configuration (exclude src/, tests/, config files)
+  - path: .editorconfig
+    action: create
+    description: code style consistency (2-space indent, LF, UTF-8)
   - path: README.md
     action: create
-    description: basic project documentation
+    description: basic project overview and installation instructions
 ---
 
 **Description:**
-Set up the basic TypeScript project structure with configuration files and directory layout for the Lemegeton npm package.
+Set up the foundational TypeScript project structure with build configuration, package metadata, and CLI entry point shim for the Lemegeton npm package.
 
 **Acceptance Criteria:**
-- [ ] TypeScript configured properly
-- [ ] Basic build scripts work
+- [ ] TypeScript configured for ES2020 with declaration generation
+- [ ] `npm run build` compiles successfully to dist/
+- [ ] .d.ts type declaration files generated in dist/
+- [ ] bin/lemegeton shim is executable and importable
+- [ ] package.json has all core build scripts and dependencies
 - [ ] Project structure follows npm package best practices
-- [ ] Can run `npm run build` successfully
+- [ ] README.md provides installation and basic usage
 
 **Notes:**
-Simple scaffolding task suitable for Haiku model. Establishes the foundation for all subsequent development.
+Minimal scaffolding establishing the foundation. bin/lemegeton is a stub; full CLI commands implemented in PR-014. src/index.ts is minimal; type exports added as subsequent PRs define interfaces in PR-002.
 
 ### PR-002: Core Data Models and Interfaces
 

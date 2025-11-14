@@ -1,0 +1,17 @@
+#!/usr/bin/env node
+
+/**
+ * Lemegeton CLI Entry Point
+ *
+ * This is a shim that will be connected to the full CLI module.
+ * CLI command structure (plan, hub, run, etc.) will be implemented in PR-014.
+ */
+
+// Placeholder for CLI entry point
+// When PR-014 is implemented, this will import and run the actual CLI module:
+// const cli = require('../dist/cli');
+// cli.run(process.argv.slice(2));
+
+console.error('Error: Lemegeton CLI not yet fully implemented.');
+console.error('Please wait for PR-014 (CLI Command Structure) to be completed.');
+process.exit(1);

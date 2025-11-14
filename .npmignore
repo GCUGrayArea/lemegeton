@@ -1,0 +1,25 @@
+# Source files
+src/
+
+# Tests
+tests/
+**/*.test.ts
+**/*.test.js
+
+# Configuration files
+tsconfig.json
+.editorconfig
+jest.config.js
+
+# Development
+.github/
+.claude/
+.env*
+*.tsbuildinfo
+
+# Documentation (except README)
+docs/
+
+# Build artifacts
+*.map
+.DS_Store
