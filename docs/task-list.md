@@ -346,7 +346,7 @@ Implement memory bank system adapted from Picatrix with MemoryAdapter pattern to
 ---
 pr_id: PR-004
 title: Redis Client with Configuration and Auto-spawn
-cold_state: new
+cold_state: completed
 priority: critical
 complexity:
   score: 8
@@ -405,7 +405,7 @@ Critical component requiring careful configuration management and fallback logic
 ---
 pr_id: PR-005
 title: File Lease System
-cold_state: new
+cold_state: completed
 priority: critical
 complexity:
   score: 8

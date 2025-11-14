@@ -90,15 +90,34 @@ const container = await docker.runContainer({
 - Consecutive failure tracking before action
 - Automatic recovery attempts
 
-### Lease Management (Planned)
+### Lease Management (Implemented)
 ```typescript
-// Atomic multi-file lease pattern
-WATCH files
-CHECK conflicts
-MULTI
-  SET lease:file1
-  SET lease:file2
-EXEC
+// Atomic multi-file lease pattern with WATCH
+await executeAtomic(client, watchKeys, async (multi) => {
+  // Build transaction
+  multi.set(leaseKey1, metadata, { NX: true, EX: ttl });
+  multi.set(leaseKey2, metadata, { NX: true, EX: ttl });
+  multi.sAdd(agentSetKey, [file1, file2]);
+  multi.sAdd(prSetKey, [file1, file2]);
+});
+```
+
+### Paired File Locking
+```typescript
+// Automatically detect and lock test files with source
+const paired = await expandWithPairedFiles(files, patterns, checkExists);
+// paired.all contains both source and test files
+```
+
+### Heartbeat Pattern
+```typescript
+// Background heartbeat for lease renewal
+private startHeartbeat() {
+  this.heartbeatTimer = setInterval(async () => {
+    await this.renewAllLeases();
+    this.emit('heartbeat', { files: this.activeLeases });
+  }, HEARTBEAT_INTERVAL);
+}
 ```
 
 ## Docker Patterns

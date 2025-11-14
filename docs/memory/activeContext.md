@@ -24,18 +24,30 @@ Working on Block 2: Redis and Coordination infrastructure
   - Redis client quit() returns string, needed wrapping for Promise<void>
   - Test environment (NODE_ENV=test) interfered with default config expectations
 
+### PR-005: File Lease System ✅
+- **Complexity**: 8 (Opus-level) - Critical coordination infrastructure
+- **Key Implementation Decisions**:
+  - WATCH/MULTI/EXEC for true atomic operations with optimistic locking
+  - Automatic paired file detection (source + test files locked together)
+  - Integrated heartbeat system with EventEmitter for lifecycle events
+  - Path normalization for cross-platform compatibility
+  - Comprehensive test file pattern support (TypeScript, JavaScript, Python, Go, Ruby, Rust)
+
+- **Notable Features**:
+  - Retry logic with exponential backoff for transaction conflicts
+  - Lease metadata includes agentId, prId, timestamp, TTL, and heartbeat
+  - Redis sets track leases by agent and PR for efficient bulk operations
+  - Graceful handling of partial releases and renewals
+
+- **Testing Challenges**:
+  - Windows path separator differences required normalization in tests
+  - Pattern matching logic needed careful test case adjustments
+  - Integration tests skipped when Docker unavailable (maintains test suite portability)
+
 ## Active PRs
 
-### PR-005: File Lease System (Planned)
-- **Complexity**: 8 (Opus-level)
-- **Key Design Points**:
-  - Atomic multi-file acquisition using Redis MULTI/EXEC
-  - Paired locking for source + test files
-  - 5-minute TTL with 2-minute heartbeat renewal
-  - Conflict information returned on failure
-
 ### PR-006: Coordination Mode Manager (Not Started)
-- Depends on PR-004 ✅ and PR-005
+- Depends on PR-004 ✅ and PR-005 ✅
 - Will handle distributed/degraded/isolated mode transitions
 
 ## Technical Decisions
@@ -71,6 +83,6 @@ Working on Block 2: Redis and Coordination infrastructure
 - Comprehensive test coverage for critical infrastructure
 
 ## Next Steps
-1. Implement PR-005 (File Lease System) with atomic operations
-2. Focus on race condition handling and paired file locking
-3. Then proceed to PR-006 (Coordination Mode Manager)
+1. ~~Implement PR-005 (File Lease System) with atomic operations~~ ✅
+2. Begin PR-006 (Coordination Mode Manager) implementation
+3. Focus on mode transitions and health-based degradation logic
