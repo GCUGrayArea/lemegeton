@@ -388,14 +388,14 @@ estimated_files:
 Implement configuration management and Redis client with automatic Docker container spawning when no external Redis is configured OR when configured Redis is unavailable, including health checks and connection recovery.
 
 **Acceptance Criteria:**
-- [ ] Reads configuration from .env file using dotenv
-- [ ] Provides secure defaults (localhost, no auth)
-- [ ] Auto-spawns Redis in Docker when: no REDIS_URL configured OR configured REDIS_URL connection fails
-- [ ] Falls back gracefully if Docker unavailable
-- [ ] Health checks work correctly
-- [ ] Connection recovery implemented
-- [ ] Configuration follows security model (no API keys, only infrastructure config)
-- [ ] Works on Windows, macOS, Linux
+- [x] Reads configuration from .env file using dotenv
+- [x] Provides secure defaults (localhost, no auth)
+- [x] Auto-spawns Redis in Docker when: no REDIS_URL configured OR configured REDIS_URL connection fails
+- [x] Falls back gracefully if Docker unavailable
+- [x] Health checks work correctly
+- [x] Connection recovery implemented
+- [x] Configuration follows security model (no API keys, only infrastructure config)
+- [x] Works on Windows, macOS, Linux
 
 **Notes:**
 Critical component requiring careful configuration management and fallback logic. Auto-spawn triggers on missing config OR failed connection to ensure system always tries to work.
@@ -432,12 +432,12 @@ estimated_files:
 Implement atomic file lease acquisition using Redis MULTI/EXEC, with paired locking for test files and proper TTL management.
 
 **Acceptance Criteria:**
-- [ ] Atomic multi-file lease acquisition works
-- [ ] Paired locking (file + test) implemented
-- [ ] 5-minute TTL with heartbeat renewal
-- [ ] Conflict details returned on failure
-- [ ] Race conditions properly handled
-- [ ] Lease cleanup on agent crash
+- [x] Atomic multi-file lease acquisition works
+- [x] Paired locking (file + test) implemented
+- [x] 5-minute TTL with heartbeat renewal
+- [x] Conflict details returned on failure
+- [x] Race conditions properly handled
+- [x] Lease cleanup on agent crash
 
 **Notes:**
 Critical system component requiring careful attention to atomicity and edge cases. Opus recommended for thoroughness.
