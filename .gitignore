@@ -1,0 +1,213 @@
+# Lemegeton .gitignore
+# Node.js + TypeScript + Redis development environment
+
+# ============================================================================
+# Build Output
+# ============================================================================
+dist/
+build/
+*.tsbuildinfo
+
+# ============================================================================
+# Dependencies
+# ============================================================================
+node_modules/
+jspm_packages/
+
+# ============================================================================
+# Testing
+# ============================================================================
+coverage/
+*.lcov
+.nyc_output/
+test-results/
+junit.xml
+
+# ============================================================================
+# Logs
+# ============================================================================
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# ============================================================================
+# Environment & Configuration
+# ============================================================================
+.env
+.env.local
+.env.*.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# ============================================================================
+# OS Files
+# ============================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ============================================================================
+# IDE & Editors
+# ============================================================================
+# VSCode
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# JetBrains (WebStorm, IntelliJ, etc.)
+.idea/
+*.iml
+*.iws
+*.ipr
+.idea_modules/
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+Session.vim
+Sessionx.vim
+.netrwhist
+tags
+[._]*.un~
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+auto-save-list
+tramp
+.\#*
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# ============================================================================
+# Runtime & Temporary Files
+# ============================================================================
+*.pid
+*.seed
+*.pid.lock
+.npm
+.eslintcache
+.node_repl_history
+.yarn-integrity
+*.tgz
+.cache/
+
+# ============================================================================
+# Redis Data (local development)
+# ============================================================================
+dump.rdb
+appendonly.aof
+redis-data/
+
+# ============================================================================
+# Docker
+# ============================================================================
+# Don't ignore docker-compose.yml (we want that committed)
+# But ignore runtime files
+.docker/
+docker-compose.override.yml
+
+# ============================================================================
+# Documentation Build Artifacts
+# ============================================================================
+docs/api/
+.typedoc/
+
+# ============================================================================
+# Package Manager Lock Files (keep package-lock.json, ignore others)
+# ============================================================================
+yarn.lock
+pnpm-lock.yaml
+
+# ============================================================================
+# Lemegeton-Specific Runtime Files
+# ============================================================================
+# Task list backups created during hydration/sync
+docs/task-list.md.backup
+docs/task-list.md.bak
+
+# Isolated mode state files (when Redis unavailable)
+.lemegeton-state/
+*.lemegeton-state.json
+
+# Memory bank storage (will be git-based in v1.0, but ignore local cache)
+.memory-bank-cache/
+
+# Local agent logs
+.agent-logs/
+
+# MCP server cache
+.mcp-cache/
+
+# ============================================================================
+# Sensitive Files (extra safety)
+# ============================================================================
+# API keys, tokens, credentials
+*.key
+*.pem
+*.crt
+*.p12
+secrets.json
+credentials.json
+.secrets/
+
+# GitHub tokens
+.github-token
+.anthropic-key
+.openai-key
+
+# ============================================================================
+# Performance & Profiling
+# ============================================================================
+*.cpuprofile
+*.heapprofile
+*.heapsnapshot
+.clinic/
+profile-*
+
+# ============================================================================
+# Miscellaneous
+# ============================================================================
+.DS_Store?
+.Spotlight-V100
+.TemporaryItems
+.fseventsd
+.DocumentRevisions-V100
+.VolumeIcon.icns
+.com.apple.timemachine.donotpresent
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
