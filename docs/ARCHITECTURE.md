@@ -1099,6 +1099,400 @@ DOCKER_SOCKET=/var/run/docker.sock
 
 ---
 
+### Package Structure & Distribution
+
+#### NPM Package Layout
+
+```
+lemegeton/                          # Published to npm
+├── dist/                           # Compiled JavaScript
+│   ├── hub/
+│   ├── agents/
+│   ├── adapters/
+│   ├── ui/
+│   └── cli/
+├── prompts/                        # Default prompts (bundled)
+│   ├── agent-planning.md
+│   ├── coding-agent.md
+│   └── qc-agent.md
+├── bin/
+│   └── lemegeton.js               # CLI entry point
+├── package.json
+└── README.md
+
+# NOT in package (stays in user's project):
+.lemegeton/                        # Created by 'lemegeton init'
+├── config.yaml                    # User's configuration
+└── prompts/                       # Optional overrides
+    └── agent-planning.md          # Override default prompt
+
+docs/                              # Created by Planning Agent
+├── prd.md
+├── task-list.md
+└── memory/                        # Created during execution
+    ├── systemPatterns.md
+    ├── techContext.md
+    ├── activeContext.md
+    └── progress.md
+```
+
+#### CLI Entry Point
+
+```typescript
+#!/usr/bin/env node
+// bin/lemegeton.js
+
+import { Command } from 'commander';
+import { HubCommand } from '../dist/cli/hub.js';
+import { RunCommand } from '../dist/cli/run.js';
+import { PlanCommand } from '../dist/cli/plan.js';
+
+const program = new Command();
+
+program
+  .name('lemegeton')
+  .description('AI agent orchestration for parallel development')
+  .version('1.0.0');
+
+program
+  .command('init')
+  .description('Initialize Lemegeton in current project')
+  .action(async () => {
+    const init = new InitCommand();
+    await init.execute();
+  });
+
+program
+  .command('hub')
+  .description('Manage Hub daemon')
+  .argument('<action>', 'start | stop | status')
+  .action(async (action) => {
+    const hub = new HubCommand();
+    await hub.execute(action);
+  });
+
+program
+  .command('run')
+  .description('Spawn coding agents')
+  .option('-a, --agents <count>', 'Number of agents', '4')
+  .action(async (options) => {
+    const run = new RunCommand();
+    await run.execute(options);
+  });
+
+program
+  .command('plan')
+  .description('Generate PRD and task list from spec')
+  .argument('<spec>', 'Path to spec file')
+  .option('-i, --interactive', 'Interactive mode', true)
+  .action(async (spec, options) => {
+    const plan = new PlanCommand();
+    await plan.execute(spec, options);
+  });
+
+program.parse();
+```
+
+#### Initialization Command
+
+```typescript
+class InitCommand {
+  async execute() {
+    const projectRoot = process.cwd();
+    
+    console.log('🚀 Initializing Lemegeton in', projectRoot);
+    
+    // 1. Create .lemegeton directory
+    const lemegetonDir = path.join(projectRoot, '.lemegeton');
+    await fs.mkdir(lemegetonDir, { recursive: true });
+    
+    // 2. Create default config
+    const configPath = path.join(lemegetonDir, 'config.yaml');
+    if (!fs.existsSync(configPath)) {
+      await fs.writeFile(configPath, this.getDefaultConfig());
+      console.log('✓ Created .lemegeton/config.yaml');
+    } else {
+      console.log('⚠ .lemegeton/config.yaml already exists, skipping');
+    }
+    
+    // 3. Create docs directory
+    const docsDir = path.join(projectRoot, 'docs');
+    await fs.mkdir(docsDir, { recursive: true });
+    await fs.writeFile(path.join(docsDir, '.gitkeep'), '');
+    console.log('✓ Created docs/ directory');
+    
+    // 4. Add to .gitignore
+    const gitignorePath = path.join(projectRoot, '.gitignore');
+    await this.updateGitignore(gitignorePath);
+    console.log('✓ Updated .gitignore');
+    
+    console.log('\n✨ Lemegeton initialized!');
+    console.log('\nNext steps:');
+    console.log('  1. Edit .lemegeton/config.yaml (add API keys)');
+    console.log('  2. Create a spec file: docs/spec.md');
+    console.log('  3. Run: lemegeton plan docs/spec.md');
+    console.log('  4. Run: lemegeton hub start && lemegeton run --agents=4');
+  }
+  
+  private getDefaultConfig(): string {
+    return `# Lemegeton Configuration
+
+# MCP Servers
+mcp_servers:
+  github:
+    enabled: true
+    token: $GITHUB_TOKEN  # Optional, increases rate limits
+  
+  docs:
+    enabled: true
+    sources: [mdn, npm, pypi, crates_io, go_pkg, docs_rs]
+  
+  brave_search:
+    enabled: true
+    api_key: $BRAVE_API_KEY  # Free tier: 2000 queries/month
+  
+  # Project-specific (disabled by default)
+  postgres:
+    enabled: false
+    connection_string: $DATABASE_URL
+  
+  stripe:
+    enabled: false
+    api_key: $STRIPE_SECRET_KEY
+  
+  aws:
+    enabled: false
+    credentials: $AWS_CREDENTIALS
+
+# Agent Settings
+agents:
+  max_parallel: 10
+  heartbeat_interval: 30  # seconds
+  lease_ttl: 300          # seconds (5 minutes)
+
+# Redis
+redis:
+  url: redis://localhost:6379
+  auto_start: true        # Spawn Docker container if not running
+
+# Git
+git:
+  auto_commit: true       # Hub auto-commits cold state transitions
+  commit_author: lemegeton-hub
+`;
+  }
+  
+  private async updateGitignore(gitignorePath: string) {
+    let content = '';
+    if (fs.existsSync(gitignorePath)) {
+      content = await fs.readFile(gitignorePath, 'utf-8');
+    }
+    
+    if (!content.includes('.lemegeton/prompts/')) {
+      content += `\n# Lemegeton
+.lemegeton/prompts/      # Optional prompt overrides (user-specific)
+`;
+      await fs.writeFile(gitignorePath, content);
+    }
+  }
+}
+```
+
+#### Prompt Loading Strategy
+
+```typescript
+class PromptLoader {
+  private packageRoot: string;
+  private projectRoot: string;
+  
+  constructor() {
+    // Package root: where lemegeton is installed
+    this.packageRoot = path.join(__dirname, '../..');
+    
+    // Project root: where user ran lemegeton command
+    this.projectRoot = process.cwd();
+  }
+  
+  async loadPrompt(name: string): Promise<string> {
+    // 1. Check for user override in .lemegeton/prompts/
+    const overridePath = path.join(
+      this.projectRoot,
+      '.lemegeton/prompts',
+      `${name}.md`
+    );
+    
+    if (fs.existsSync(overridePath)) {
+      console.log(`📝 Using custom prompt: ${name}.md`);
+      return fs.readFile(overridePath, 'utf-8');
+    }
+    
+    // 2. Fall back to default in package
+    const defaultPath = path.join(
+      this.packageRoot,
+      'prompts',
+      `${name}.md`
+    );
+    
+    if (fs.existsSync(defaultPath)) {
+      console.log(`📝 Using default prompt: ${name}.md`);
+      return fs.readFile(defaultPath, 'utf-8');
+    }
+    
+    throw new Error(`Prompt not found: ${name}.md`);
+  }
+  
+  async listAvailablePrompts(): Promise<string[]> {
+    const defaultPrompts = await fs.readdir(
+      path.join(this.packageRoot, 'prompts')
+    );
+    
+    const overrideDir = path.join(this.projectRoot, '.lemegeton/prompts');
+    const overridePrompts = fs.existsSync(overrideDir)
+      ? await fs.readdir(overrideDir)
+      : [];
+    
+    return [...new Set([...defaultPrompts, ...overridePrompts])];
+  }
+}
+```
+
+#### Configuration Loading
+
+```typescript
+class ConfigLoader {
+  async loadConfig(): Promise<LemegetonConfig> {
+    const configPath = path.join(process.cwd(), '.lemegeton/config.yaml');
+    
+    if (!fs.existsSync(configPath)) {
+      throw new Error(
+        'No .lemegeton/config.yaml found. Run "lemegeton init" first.'
+      );
+    }
+    
+    const content = await fs.readFile(configPath, 'utf-8');
+    const config = yaml.parse(content) as LemegetonConfig;
+    
+    // Resolve environment variables
+    this.resolveEnvVars(config);
+    
+    // Validate required fields
+    this.validate(config);
+    
+    return config;
+  }
+  
+  private resolveEnvVars(obj: any) {
+    for (const key in obj) {
+      if (typeof obj[key] === 'string' && obj[key].startsWith('$')) {
+        const envVar = obj[key].slice(1);
+        obj[key] = process.env[envVar];
+      } else if (typeof obj[key] === 'object') {
+        this.resolveEnvVars(obj[key]);
+      }
+    }
+  }
+}
+```
+
+#### package.json
+
+```json
+{
+  "name": "lemegeton",
+  "version": "1.0.0",
+  "description": "AI agent orchestration for parallel development",
+  "main": "dist/index.js",
+  "bin": {
+    "lemegeton": "./bin/lemegeton.js"
+  },
+  "files": [
+    "dist/",
+    "prompts/",
+    "bin/"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "jest",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "ai",
+    "agents",
+    "orchestration",
+    "development",
+    "automation",
+    "claude",
+    "cursor",
+    "codex"
+  ],
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "commander": "^11.0.0",
+    "redis": "^4.6.0",
+    "simple-git": "^3.20.0",
+    "yaml": "^2.3.0",
+    "blessed": "^0.1.81",
+    "dotenv": "^16.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0",
+    "jest": "^29.0.0"
+  }
+}
+```
+
+#### Publishing to npm
+
+```bash
+# 1. Build
+npm run build
+
+# 2. Test locally
+npm link
+cd ~/test-project
+lemegeton init
+
+# 3. Publish
+npm publish
+
+# Users can then:
+npm install -g lemegeton
+# or
+npx lemegeton init
+```
+
+#### Version Updates
+
+When Lemegeton is updated, users get new features without touching their project files:
+
+```bash
+# User's workflow
+npm update -g lemegeton
+
+# Their project files stay unchanged:
+# - .lemegeton/config.yaml (their settings)
+# - docs/prd.md (their project)
+# - docs/task-list.md (their work)
+# - docs/memory/ (their institutional knowledge)
+
+# But they get:
+# - Latest Hub coordinator
+# - Latest agent implementations
+# - Latest MCP adapters
+# - Bug fixes and improvements
+```
+
+**Benefits:**
+- Hub code doesn't clutter user's project
+- Updates are seamless (`npm update`)
+- Users only commit their project-specific files
+- Easier to maintain (one codebase in npm, not scattered across user repos)
+
+---
+
 ## Deployment Architecture (Updated)
 
 ### Zero-Config Local Setup
