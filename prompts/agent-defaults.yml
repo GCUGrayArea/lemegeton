@@ -1,0 +1,209 @@
+name: agent-defaults
+version: "1.0"
+description: Core coordination workflow for Lemegeton agents, including work claiming, state management, Redis coordination, and coding standards.
+
+# Work Claiming Process
+# How agents discover and claim available work
+workClaiming:
+  checkAvailability: |
+    Before claiming work, query the Hub to check Redis for available PRs.
+
+    Available work is determined by:
+    1. PR status is a claimable cold state (ready, blocked with dependencies met, broken)
+    2. No active file leases conflict with the PR's expected file list
+    3. No halt signal in Redis (check halt:active key)
+
+    Never claim work by reading task-list.md directly. Always query through Hub's
+    coordination layer to ensure Redis state is authoritative.
+
+  priority:
+    - broken     # PRs in broken state (highest priority - fix regressions)
+    - suspended  # PRs in suspended state (resume interrupted work)
+    - blocked    # PRs blocked but now unblocked (dependencies resolved)
+    - ready      # New PRs ready for work (normal priority)
+
+  leaseChecking: |
+    Before transitioning a PR to in-progress hot state, verify no file lease conflicts:
+
+    1. Get the PR's expected file list from task-list.md
+    2. Query Redis for active file leases: GET lease:<file-path>
+    3. If any lease exists and is owned by another agent, DO NOT claim work
+    4. If all files are available, acquire leases atomically using Redis MULTI/EXEC:
+       - MULTI
+       - SET lease:<file-path-1> <agent-id> EX <ttl>
+       - SET lease:<file-path-2> <agent-id> EX <ttl>
+       - EXEC
+    5. Only after successful lease acquisition, transition to in-progress hot state
+
+    File leases prevent merge conflicts by ensuring exclusive write access.
+
+# Hot and Cold State Model
+# Lemegeton uses dual-state coordination for performance and durability
+stateModel:
+  hotStates:
+    - investigating  # Agent exploring codebase, understanding requirements
+    - planning       # Agent breaking down PR into implementation steps
+    - in-progress    # Agent actively writing code
+    - under-review   # Agent's work submitted, awaiting QC validation
+
+  coldStates:
+    - ready          # PR defined, ready to be claimed
+    - blocked        # PR blocked on dependencies or external factors
+    - planned        # PR planned by Planning Agent, ready for implementation
+    - completed      # Implementation done, code committed
+    - approved       # QC passed, merged to main
+    - broken         # PR implementation caused failures, needs fixing
+
+  hotCoordination: |
+    Hot states are ephemeral and coordinated entirely via Redis.
+
+    Transitioning between hot states:
+    1. SET pr:<pr-id>:status <new-hot-state>
+    2. SET pr:<pr-id>:agent <agent-id>
+    3. SET pr:<pr-id>:updated <timestamp>
+    4. PUBLISH pr:status:changed {"pr": "<pr-id>", "status": "<new-status>"}
+
+    No git commits are made for hot state transitions. This enables real-time
+    coordination without git overhead.
+
+    Hot states are lost on Redis failure or Hub restart. Cold states in
+    task-list.md are authoritative for recovery.
+
+  coldTransitions: |
+    Cold states are durable and require both Redis update AND task-list.md commit.
+
+    Planning phase (autonomous):
+    - ready → planned: Planning Agent auto-commits task-list.md + prd.md
+    - Commit immediately without approval
+    - Format: "[Planning Agent] PR-XXX: ready → planned"
+
+    Implementation phase (requires approval):
+    - in-progress → completed: Bundle task-list.md with code commit
+    - Request user approval for entire commit
+    - Format: "[Agent] PR-XXX: Implementation with state update to completed"
+
+    Other cold transitions:
+    - completed → approved: QC Agent after validation
+    - any → broken: When tests fail after merge
+    - any → blocked: When dependencies discovered
+
+    ALWAYS git pull before committing to avoid conflicts.
+
+# Redis Coordination Primitives
+# How to use Redis for distributed coordination
+redisCoordination:
+  locking: |
+    Use Redis SETNX for distributed locking with automatic expiration.
+
+    Acquire lock:
+      SET lock:<resource> <agent-id> NX EX <ttl-seconds>
+      Returns 1 if acquired, 0 if already locked
+
+    Release lock:
+      DEL lock:<resource>
+      Only delete if you own the lock (check GET lock:<resource> first)
+
+    Extend lock:
+      EXPIRE lock:<resource> <new-ttl>
+      Use for long-running operations to prevent timeout
+
+    Common locks:
+    - lock:pr:<pr-id> - Exclusive access to PR
+    - lock:task-list - Exclusive access to task-list.md
+    - lock:planning - Only one Planning Agent at a time
+
+  transactions: |
+    Use Redis MULTI/EXEC for atomic multi-step operations.
+
+    Example: Claiming work atomically
+      MULTI
+      SET pr:<pr-id>:status in-progress
+      SET pr:<pr-id>:agent <agent-id>
+      SET lease:<file-1> <agent-id> EX 7200
+      SET lease:<file-2> <agent-id> EX 7200
+      EXEC
+
+    If any command fails or Redis connection drops, entire transaction rolls back.
+    This prevents partial updates that could cause coordination issues.
+
+    NEVER update multiple coordination keys without MULTI/EXEC.
+
+  pubsub: |
+    Use Redis pub/sub for real-time notifications between agents.
+
+    Channels:
+    - pr:status:changed - PR status transitions
+    - halt:signal - Emergency stop broadcast
+    - file:released - File lease released, work may be available
+    - qc:completed - QC validation finished
+
+    Subscribe:
+      SUBSCRIBE pr:status:changed halt:signal
+
+    Publish:
+      PUBLISH pr:status:changed '{"pr":"PR-042","status":"completed"}'
+
+    Agents should subscribe to relevant channels and react to notifications
+    without polling. This reduces Redis load and enables instant coordination.
+
+# Coding Standards
+# Enforced size limits to maintain code quality
+codingStandards:
+  maxFunctionLines: 75
+  maxFileLines: 750
+
+  decompositionStrategies:
+    - "Extract helper functions: Move complex logic into well-named private functions"
+    - "Name predicates: Replace complex boolean expressions with named predicate functions"
+    - "Create utility modules: Move reusable logic into shared utility files"
+    - "Separate concerns: Split files by responsibility (models, services, utils, tests)"
+    - "Decompose classes: Break large classes into smaller, focused classes"
+    - "Use composition: Combine smaller objects rather than building large monoliths"
+
+  enforcement: |
+    When you encounter or write code exceeding these limits:
+
+    1. STOP immediately
+    2. Refactor using decomposition strategies above
+    3. Ensure each extracted piece has a single, clear responsibility
+    4. Prefer many small, well-named functions over fewer large functions
+
+    These limits are HARD constraints. Code exceeding them will fail QC.
+
+# Emergency Procedures
+# Coordinated halt and graceful shutdown
+emergency:
+  haltChecking: |
+    Check for halt signal at these checkpoints:
+
+    1. Before claiming new work
+    2. Before each hot state transition
+    3. After completing a sub-task
+    4. Every 5-10 minutes during long-running operations
+
+    Check Redis key: GET halt:active
+    If value is "1" or exists, halt signal is active.
+
+    Also subscribe to Redis channel: SUBSCRIBE halt:signal
+    Halt broadcasts are instant via pub/sub.
+
+  haltResponse: |
+    When halt signal detected:
+
+    1. Stop current operation immediately
+    2. If in middle of work:
+       - Commit partial progress if meaningful
+       - Transition PR to suspended hot state
+       - Add notes about current progress to task-list.md
+    3. Release all file leases: DEL lease:<file-path>
+    4. Release all locks: DEL lock:<resource>
+    5. Set agent status to halted: SET agent:<agent-id>:status halted
+    6. Exit gracefully
+
+    DO NOT:
+    - Start new work
+    - Make new commits (unless saving meaningful progress)
+    - Leave locks or leases held
+    - Ignore halt signal
+
+    User will use /resume command to clear halt signal when ready.

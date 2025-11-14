@@ -104,6 +104,30 @@ export {
 } from './cost';
 
 // ============================================================================
+// Prompts
+// ============================================================================
+
+export {
+  PromptName
+} from './prompts';
+
+export type {
+  BasePrompt,
+  AgentDefaultsPrompt,
+  CommitPolicyPrompt,
+  CostGuidelinesPrompt,
+  PlanningAgentPrompt,
+  Prompt
+} from './prompts';
+
+export {
+  isAgentDefaultsPrompt,
+  isCommitPolicyPrompt,
+  isCostGuidelinesPrompt,
+  isPlanningAgentPrompt
+} from './prompts';
+
+// ============================================================================
 // Version
 // ============================================================================
 

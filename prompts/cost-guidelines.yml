@@ -1,0 +1,330 @@
+name: cost-guidelines
+version: "1.0"
+description: Cost control and model selection guidelines for heterogeneous agent pools, enabling intelligent routing based on PR complexity and budget enforcement.
+
+# Model Tier Routing
+# Route PRs to appropriate models based on complexity score
+modelRouting:
+  tiers:
+    - complexityRange: "1-2"
+      model: "haiku"
+      description: |
+        Simple, straightforward PRs with minimal dependencies.
+        Examples:
+        - Documentation updates
+        - Simple bug fixes in isolated functions
+        - Adding basic tests
+        - Configuration tweaks
+        Expected completion: 10-20 minutes
+
+    - complexityRange: "3-7"
+      model: "sonnet"
+      description: |
+        Moderate complexity PRs requiring analysis and coordination.
+        Examples:
+        - New feature implementation
+        - Refactoring existing code
+        - Integration with external services
+        - Multi-file changes with dependencies
+        Expected completion: 30-60 minutes
+
+    - complexityRange: "8-10"
+      model: "opus"
+      description: |
+        High complexity PRs requiring deep reasoning and architecture decisions.
+        Examples:
+        - Major architectural changes
+        - Complex algorithm implementation
+        - Cross-cutting concerns affecting many files
+        - Performance optimization requiring profiling
+        Expected completion: 60-120 minutes
+
+  expectedDistribution:
+    haiku: "60%"     # Majority of PRs are simple
+    sonnet: "35%"    # Moderate complexity is common
+    opus: "5%"       # High complexity is rare
+
+  complexityFactors: |
+    PR complexity is scored 1-10 based on:
+
+    1. File count (30% weight):
+       - 1 file: +1 point
+       - 2-3 files: +2 points
+       - 4-6 files: +3 points
+       - 7-10 files: +4 points
+       - 11+ files: +5 points
+
+    2. Dependency count (25% weight):
+       - No dependencies: +0 points
+       - 1-2 dependencies: +1 point
+       - 3-5 dependencies: +2 points
+       - 6+ dependencies: +3 points
+
+    3. Code change type (25% weight):
+       - Docs only: +1 point
+       - Bug fix: +2 points
+       - New feature: +3 points
+       - Refactoring: +4 points
+       - Architecture change: +5 points
+
+    4. Keywords in description (20% weight):
+       - Simple, fix, update, docs: +1 point
+       - Implement, add, feature: +2 points
+       - Refactor, optimize, redesign: +3 points
+       - Architecture, migration, rewrite: +4 points
+
+    Total these points to get complexity score (1-10 scale, normalized).
+
+  routingLogic: |
+    When claiming work, Hub assigns agent from appropriate tier:
+
+    1. Calculate PR complexity score (1-10)
+    2. Select tier: Haiku (<3), Sonnet (3-7), Opus (>7)
+    3. Check budget remaining for that tier
+    4. If budget allows, assign agent from tier
+    5. If budget exhausted, either:
+       - Queue work until budget resets
+       - Downgrade to cheaper tier (with user approval for Opus→Sonnet)
+
+    Agents do NOT self-select tiers. Hub makes routing decisions based on
+    complexity and budget.
+
+# Budget Enforcement
+# Track and enforce spending limits
+budgetEnforcement:
+  tokensPerPR:
+    warning: 50000     # Warn if PR uses >50k tokens
+    hard: 100000       # Fail if PR uses >100k tokens
+
+  tokensPerHour:
+    warning: 200000    # Warn if hour uses >200k tokens across all agents
+    hard: 500000       # Throttle if hour uses >500k tokens
+
+  costPerDay:
+    warning: 5.00      # Warn if day cost >$5 (USD)
+    hard: 20.00        # Stop new work if day cost >$20
+
+  trackingMechanism: |
+    Hub tracks token usage and costs in Redis:
+
+    Per-PR tracking:
+      HINCRBY pr:<pr-id>:tokens input <input-tokens>
+      HINCRBY pr:<pr-id>:tokens output <output-tokens>
+      HINCRBYFLOAT pr:<pr-id>:cost usd <cost>
+
+    Per-hour tracking (rolling window):
+      HINCRBY usage:hour:<timestamp>:tokens input <input-tokens>
+      HINCRBY usage:hour:<timestamp>:tokens output <output-tokens>
+      EXPIRE usage:hour:<timestamp> 3600
+
+    Per-day tracking (rolling window):
+      HINCRBYFLOAT usage:day:<date>:cost usd <cost>
+      EXPIRE usage:day:<date> 86400
+
+    Before assigning work, Hub checks all limits and enforces policy.
+
+  enforcementActions: |
+    When approaching warning threshold (90%):
+    1. Log warning to Hub logs
+    2. Notify user via stdout/TUI
+    3. Continue work normally
+
+    When hitting hard limit (100%):
+    1. Stop assigning new work from that tier
+    2. Allow in-progress work to complete
+    3. Alert user prominently
+    4. Suggest budget increase or wait for window to roll
+
+    When exceeding hard limit:
+    1. Reject new work assignment
+    2. Return error to agent
+    3. User must manually increase budget or wait
+
+# Fallback Strategies
+# What to do when approaching or exceeding limits
+fallbackStrategies:
+  approachingLimit: |
+    When usage reaches 90% of any limit:
+
+    1. Check if downgrade is possible:
+       - Opus → Sonnet: Always attempt for eligible PRs
+       - Sonnet → Haiku: Only for simple PRs (complexity <4)
+
+    2. Notify user with cost report:
+       - Current usage vs limit
+       - Estimated time until limit exceeded
+       - Recommendation (increase budget, wait, or downgrade)
+
+    3. Continue work with cheaper models where possible
+
+    Do NOT silently downgrade Opus work to Haiku - quality matters.
+    Only downgrade one tier at a time.
+
+  limitExceeded: |
+    When hard limit exceeded:
+
+    1. Immediate actions:
+       - Stop accepting new work
+       - Let current work complete
+       - Queue pending PRs
+
+    2. User notification:
+       - "Daily budget of $20 exceeded. Current: $23.45"
+       - "Queueing new work until tomorrow (00:00 UTC)"
+       - "To continue now, increase budget with: lemegeton config set budget.daily 30"
+
+    3. Work resumes automatically when:
+       - Budget increased by user
+       - Time window rolls (hourly or daily)
+       - Queued work stays in ready state
+
+  userAlert: |
+    Alert user via multiple channels:
+
+    1. TUI display:
+       - Show budget bars in status section
+       - Yellow for warning (90%)
+       - Red for exceeded (100%)
+
+    2. Stdout logging:
+       - [WARN] Budget approaching: 18.23/20.00 USD daily (91%)
+       - [ERROR] Budget exceeded: 21.50/20.00 USD daily (108%)
+
+    3. Redis notification channel:
+       - PUBLISH budget:alert '{"type":"warning","limit":"daily","pct":91}'
+
+    Do NOT silently throttle. User must be aware of cost implications.
+
+# Tool-Agnostic Design
+# Support multiple LLM providers
+toolSupport:
+  providers:
+    - Claude (Anthropic)
+    - OpenCode (self-hosted)
+    - GPT-4 (OpenAI)
+    - Custom (user-defined)
+
+  costCalculation: |
+    Each provider reports token usage and costs differently.
+    Hub uses adapters to normalize:
+
+    Claude:
+      Input: $3/million tokens (Opus), $0.25/million (Haiku)
+      Output: $15/million tokens (Opus), $1.25/million (Haiku)
+
+    OpenCode:
+      Self-hosted: $0 (infrastructure costs separate)
+      Track tokens for performance monitoring only
+
+    GPT-4:
+      Input: $10/million tokens
+      Output: $30/million tokens
+
+    Custom:
+      User defines pricing in config:
+        lemegeton config set provider.custom.input_cost 5.00
+        lemegeton config set provider.custom.output_cost 15.00
+
+  providerSelection: |
+    User configures preferred provider in .lemegeton/config.yml:
+
+    providers:
+      default: claude
+      fallback: opencode  # Use if primary unavailable
+      haiku: claude-haiku-3
+      sonnet: claude-sonnet-4
+      opus: claude-opus-4
+
+    Hub respects provider preferences when assigning agents.
+    Budget enforcement applies regardless of provider (except OpenCode at $0).
+
+# Cost Optimization Strategies
+costOptimization:
+  speculativeExecution: |
+    Planning Agent uses speculative execution to reduce Opus usage:
+
+    1. Generate multiple implementation approaches (cheap Haiku calls)
+    2. Evaluate approaches for complexity and risk
+    3. Only invoke Opus for truly complex decisions
+    4. Cache decisions in Redis to avoid recomputation
+
+    This can reduce planning costs by 40-60% vs always using Opus.
+
+  incrementalTesting: |
+    QC Agent uses incremental testing to reduce validation costs:
+
+    1. Detect which tests are affected by file changes
+    2. Run only affected tests first (fast feedback)
+    3. Only run full suite if affected tests pass
+    4. Cache test results in Redis by file hash
+
+    This can reduce QC time (and thus token usage) by 80%+ for large suites.
+
+  contextPruning: |
+    Agents should minimize context sent to LLM:
+
+    1. Only include relevant files (use file leases as signal)
+    2. Prune old conversation history after checkpoints
+    3. Summarize long documents rather than sending full text
+    4. Use Redis to share context between agents vs re-fetching
+
+    Target: Keep context under 20k tokens for most operations.
+
+  modelCaching: |
+    For repetitive operations, cache LLM responses in Redis:
+
+    1. Complexity scoring: Cache scores by PR description hash
+    2. Code review patterns: Cache common violation detections
+    3. Test selection: Cache affected tests by file path
+
+    Cache TTL: 24 hours (balance freshness vs cost)
+
+# Monitoring and Reporting
+monitoring:
+  metrics: |
+    Hub exposes cost metrics via Redis:
+
+    Real-time:
+      GET usage:hour:current:tokens:input
+      GET usage:hour:current:tokens:output
+      GET usage:day:current:cost:usd
+
+    Historical (last 7 days):
+      ZRANGE usage:daily:cost:usd -7 -1 WITHSCORES
+
+    Per-agent:
+      HGETALL agent:<agent-id>:usage
+
+  reporting: |
+    User can request cost report:
+
+    $ lemegeton cost report --period daily
+
+    Output:
+      Daily Cost Report (2025-01-14)
+      ═══════════════════════════════
+      Total Cost: $12.34 / $20.00 (62%)
+
+      By Tier:
+        Haiku:  $2.10 (17%) - 18 PRs
+        Sonnet: $8.24 (67%) - 12 PRs
+        Opus:   $2.00 (16%) - 2 PRs
+
+      Top Expensive PRs:
+        PR-042: $1.85 (Opus, 93 min)
+        PR-038: $1.42 (Sonnet, 58 min)
+        PR-041: $0.98 (Sonnet, 45 min)
+
+      Recommendations:
+        ✓ Cost on track for budget
+        ✓ Tier distribution healthy (60/35/5)
+
+  alerts: |
+    Automated alerts trigger at:
+    - 50% of any limit (info)
+    - 75% of any limit (warning)
+    - 90% of any limit (critical)
+    - 100% of any limit (emergency, stop work)
+
+    Alerts publish to Redis channel: budget:alert
+    TUI subscribes and displays prominently.

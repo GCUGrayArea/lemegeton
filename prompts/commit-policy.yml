@@ -1,0 +1,295 @@
+name: commit-policy
+version: "1.0"
+description: Commit policy for Lemegeton agents, defining when and how to commit changes with distinction between autonomous planning commits and approval-required implementation commits.
+
+# Git Synchronization
+# Always stay in sync with remote to avoid conflicts
+gitSync:
+  pullBeforeCommit: |
+    ALWAYS run `git pull` before creating any commit.
+
+    This is required even though file leases prevent concurrent edits, because:
+    1. Other agents may have committed to different files
+    2. Planning Agent may have updated coordination documents
+    3. User may have made direct changes
+
+    Command sequence:
+      git pull
+      git add <files>
+      git commit -m "<message>"
+      git push
+
+    If pull fails due to conflicts, this indicates a bug in the file lease system.
+    Report to user and do not proceed with commit.
+
+  expectedMerge: |
+    Because file leases ensure exclusive write access, `git pull` should ALWAYS
+    result in a fast-forward merge.
+
+    If you see merge conflicts, this means:
+    - File lease system was bypassed (bug)
+    - User made direct edits to leased files
+    - Lease expired before commit completed
+
+    In any case, DO NOT attempt to resolve conflicts automatically.
+    Alert user and request guidance.
+
+# Planning Phase (Autonomous Commits)
+# Planning Agent can commit without approval
+planningPhase:
+  autoCommitTriggers:
+    - "Transitioning PR from ready → planned"
+    - "Updating PRD with new requirements or clarifications"
+    - "Adding new PRs to task-list.md"
+    - "Updating dependency graph in task-list.md"
+
+  includedFiles:
+    - docs/prd.md
+    - docs/task-list.md
+    - docs/architecture.md  # If Planning Agent creates/updates architecture docs
+    - .gitignore            # Planning Agent may update for tech stack
+
+  messageFormat: |
+    Commit message format for planning commits:
+
+    [Planning Agent] PR-XXX: <action>
+
+    Examples:
+    - [Planning Agent] PR-042: ready → planned
+    - [Planning Agent] Initial PRD and task list for user authentication feature
+    - [Planning Agent] Updated dependency graph with new testing PRs
+
+    Use conventional commit style:
+    - Be concise (1-2 lines)
+    - Focus on WHAT changed, not WHY (why is in the PRD)
+    - Use present tense
+
+  autonomous: true  # No user approval required
+
+  process: |
+    1. Complete planning work
+    2. Run `git pull` to sync
+    3. Stage coordination files: `git add docs/prd.md docs/task-list.md`
+    4. Commit with planning message format
+    5. Push immediately: `git push`
+    6. Update Redis: SET pr:<pr-id>:status planned
+    7. Publish notification: PUBLISH pr:status:changed
+
+    Planning commits should be fast and frequent. Do not batch multiple
+    planning changes into one commit.
+
+# Implementation Phase (Approval-Required Commits)
+# Implementation agents must request approval before committing
+implementationPhase:
+  approvalTriggers:
+    - "Transitioning PR from in-progress → completed"
+    - "All implementation code changes"
+    - "Test files created or modified"
+    - "Configuration file changes (package.json, tsconfig.json, etc.)"
+    - "Build scripts or CI/CD pipeline changes"
+
+  bundledCommit: |
+    Implementation commits bundle code changes with coordination updates.
+
+    This means a SINGLE commit contains:
+    - All implementation code for the PR
+    - All new test files
+    - Any configuration changes
+    - task-list.md update (PR status: in-progress → completed)
+
+    Do NOT create separate commits for:
+    - Code changes (first commit)
+    - task-list.md update (second commit)
+
+    Bundle everything together for logical grouping and cleaner history.
+
+  messageFormat: |
+    Commit message format for implementation commits:
+
+    [Agent Name] PR-XXX: <brief description>
+
+    <optional detailed explanation if needed>
+
+    Examples:
+    - [Blue Agent] PR-042: Implement user authentication with JWT
+    - [Orange Agent] PR-043: Add Redis connection pooling
+
+    The task-list.md update is implicit - don't mention it in message.
+
+  requiresApproval: true  # User must approve before commit
+
+  process: |
+    1. Complete implementation work
+    2. Run all relevant tests to verify functionality
+    3. Request user approval:
+       - Show diff of all changes (code + task-list.md)
+       - Explain what was implemented
+       - Confirm tests pass
+    4. If approved:
+       a. Run `git pull` to sync
+       b. Stage all files: `git add <implementation-files> docs/task-list.md`
+       c. Create commit with implementation message format
+       d. Push: `git push`
+       e. Update Redis: SET pr:<pr-id>:status completed
+       f. Publish notification: PUBLISH pr:status:changed
+       g. Release file leases: DEL lease:<file-path> for each file
+    5. If rejected:
+       a. Make requested changes
+       b. Return to step 2
+
+# State-Specific Commit Rules
+# Hot vs cold state transitions
+stateCommitRules:
+  hotStates: |
+    Hot state transitions do NOT trigger git commits.
+
+    Hot states:
+    - investigating
+    - planning (the activity, not the cold state "planned")
+    - in-progress
+    - under-review
+
+    These transitions only update Redis:
+      SET pr:<pr-id>:status <new-hot-state>
+      SET pr:<pr-id>:agent <agent-id>
+      SET pr:<pr-id>:updated <timestamp>
+
+    Example flow:
+    1. Claim work: ready (cold) → investigating (hot) - Redis only
+    2. Start coding: investigating → in-progress - Redis only
+    3. Submit for QC: in-progress → under-review - Redis only
+    4. QC approves: under-review → completed (cold) - Git commit required
+
+  coldStates: |
+    Cold state transitions require BOTH Redis update AND git commit.
+
+    Cold states:
+    - ready
+    - blocked
+    - planned
+    - completed
+    - approved
+    - broken
+
+    Planning phase cold transitions (autonomous):
+    - ready → planned: Auto-commit by Planning Agent
+    - any → blocked: Auto-commit with blocking reason
+
+    Implementation phase cold transitions (require approval):
+    - in-progress → completed: Bundled with code commit
+    - completed → approved: QC Agent commit after validation
+    - any → broken: Auto-commit with failure details
+
+    Cold state transitions persist PR status in task-list.md for durability.
+    If Redis fails, cold states can be reconstructed from git history.
+
+# Read-Only Files
+# Files that agents must NEVER modify
+readOnly:
+  - .lemegeton/prompts/*  # Governance - agents cannot modify their own instructions
+  - .claude/*             # Claude-specific configuration (if present)
+  - .git/*                # Git internals
+
+readOnlyPolicy: |
+  If a PR requires changes to read-only files, STOP and inform the user.
+
+  Read-only files define governance and system behavior. Allowing agents to
+  modify them would create security risks and unpredictable behavior.
+
+  Example: If you need to update agent-defaults.yml to fix a bug, tell the user:
+    "This PR requires updating .lemegeton/prompts/agent-defaults.yml, which is
+     read-only. User intervention required to update governance."
+
+# Atomic Commit Discipline
+# One logical change per commit
+atomicCommits: |
+  Each commit should represent ONE logical change:
+
+  Planning commits:
+  - One PR transition (ready → planned)
+  - One PRD update
+  - One task-list.md update (adding new PRs)
+
+  Implementation commits:
+  - One complete PR implementation (all files + task-list.md update)
+
+  NEVER batch multiple PR implementations into one commit.
+  NEVER split one PR implementation across multiple commits.
+
+  Exception: If a PR is very large and needs to be split, create multiple
+  smaller PRs in task-list.md instead of making multiple commits for one PR.
+
+# Commit Message Standards
+commitMessageStandards: |
+  All commits must follow this format:
+
+  [Agent Name] PR-XXX: <description>
+
+  Agent Name examples:
+  - Planning Agent (for planning commits)
+  - Blue Agent, Orange Agent, etc. (for implementation commits)
+  - QC Agent (for quality control commits)
+
+  Description guidelines:
+  - Use imperative mood: "Add feature" not "Added feature"
+  - Be concise: 50 characters or less for first line
+  - Focus on WHAT, not HOW (code shows how)
+  - Reference PR number for traceability
+
+  Bad examples:
+  - "Fixed stuff" (vague)
+  - "Updated files" (what files? why?)
+  - "WIP" (never commit work-in-progress)
+
+  Good examples:
+  - [Blue Agent] PR-042: Implement JWT authentication service
+  - [Planning Agent] PR-043: ready → planned
+  - [QC Agent] PR-042: Validation passed, mark approved
+
+# Special Cases
+specialCases:
+  emergencyFixes: |
+    If a broken PR needs immediate fixing:
+    1. Claim the PR (transitions to investigating hot state)
+    2. Fix the issue
+    3. Request approval (even though high priority, still need approval)
+    4. Bundle fix with task-list.md update (broken → completed)
+    5. QC Agent re-validates before approving
+
+  blockedPRs: |
+    When discovering a PR is blocked:
+    1. Update task-list.md with blocking reason and dependencies
+    2. Auto-commit immediately: "[Agent] PR-XXX: Mark blocked - <reason>"
+    3. Update Redis: SET pr:<pr-id>:status blocked
+    4. Release file leases if any were acquired
+    5. Publish notification so other agents know to avoid
+
+  partialWork: |
+    If you must stop work before completing a PR:
+    1. Commit partial progress ONLY if it adds value (not broken code)
+    2. Mark PR as suspended hot state in Redis
+    3. Add notes to task-list.md about current progress
+    4. Release file leases
+    5. Format: "[Agent] PR-XXX: Partial progress - <what was done>"
+
+    Prefer suspending without committing over committing broken code.
+
+# QC Agent Commit Policy
+qcCommitPolicy: |
+  QC Agent has special commit rules:
+
+  After validation passes:
+  1. No code changes (QC only validates, doesn't modify)
+  2. Update task-list.md: completed → approved
+  3. Auto-commit without approval: "[QC Agent] PR-XXX: Validation passed"
+  4. Update Redis: SET pr:<pr-id>:status approved
+  5. Merge to main branch (if configured for auto-merge)
+
+  After validation fails:
+  1. Update task-list.md: completed → broken
+  2. Add failure details to PR notes
+  3. Auto-commit: "[QC Agent] PR-XXX: Validation failed - <reason>"
+  4. Update Redis: SET pr:<pr-id>:status broken
+  5. File leases were already released by implementation agent
+
+  QC commits are autonomous because they're coordination-only (no code changes).
