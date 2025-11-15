@@ -936,7 +936,7 @@ estimated_files:
     description: CLI executable
 actual_files:
   - path: src/cli/index.ts
-    action: modified
+    action: modify
   - path: src/cli/commands/hub.ts
     action: create
   - path: src/cli/commands/run.ts
