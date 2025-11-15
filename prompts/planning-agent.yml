@@ -229,8 +229,16 @@ prTemplate:
     - actual_cost     # Actual cost incurred
     - actual_minutes  # Actual time taken
 
-# Complexity Scoring
+# Complexity Scoring Guidelines
 complexityScoring:
+  purpose: |
+    Provide initial complexity estimates (1-10) for each PR. The Hub's
+    ComplexityScorer will recalculate final scores programmatically based on
+    file count, dependencies, and keyword analysis.
+
+    Your estimates help set expectations, but final model routing uses the
+    programmatic scorer for consistency.
+
   simple:
     range: "1-3"
     model: "haiku"
@@ -274,58 +282,16 @@ complexityScoring:
       - "Security-critical infrastructure"
       - "Performance-critical optimizations"
 
-  factors:
-    fileCount:
-      weight: 0.30
-      scale:
-        - files: 1
-          points: 1
-        - files: "2-3"
-          points: 2
-        - files: "4-6"
-          points: 3
-        - files: "7-10"
-          points: 4
-        - files: "11+"
-          points: 5
+  programmaticScoring: |
+    After you generate the task list, the Hub will run ComplexityScorer which:
+    - Analyzes file count (0.5 points per file)
+    - Analyzes dependencies (1.0 point per dependency)
+    - Matches keywords with weighted patterns
+    - Considers description length for detailed requirements
+    - Normalizes to 1-10 scale
+    - Recommends model tier (haiku 1-3, sonnet 4-7, opus 8-10)
 
-    dependencies:
-      weight: 0.25
-      scale:
-        - count: 0
-          points: 0
-        - count: "1-2"
-          points: 1
-        - count: "3-5"
-          points: 2
-        - count: "6+"
-          points: 3
-
-    changeType:
-      weight: 0.25
-      types:
-        - type: "docs-only"
-          points: 1
-        - type: "bug-fix"
-          points: 2
-        - type: "new-feature"
-          points: 3
-        - type: "refactoring"
-          points: 4
-        - type: "architecture"
-          points: 5
-
-    keywords:
-      weight: 0.20
-      patterns:
-        - keywords: ["simple", "fix", "update", "docs"]
-          points: 1
-        - keywords: ["implement", "add", "feature"]
-          points: 2
-        - keywords: ["refactor", "optimize", "redesign"]
-          points: 3
-        - keywords: ["architecture", "migration", "rewrite"]
-          points: 4
+    This ensures consistent, objective scoring across all PRs.
 
 # Special PR Types
 specialPRTypes:

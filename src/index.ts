@@ -9,7 +9,38 @@ import * as pkg from '../package.json';
 
 export const version = pkg.version;
 
-// Type exports will be added here as PR-002 and subsequent PRs define interfaces
+// Cost Control (PR-017)
+export {
+  CostController,
+  CostTracker,
+  AdapterFactory,
+  AnthropicAdapter,
+  OpenAIAdapter,
+  SelfHostedAdapter,
+  MemoryStorage,
+  ANTHROPIC_PRICING,
+  OPENAI_PRICING,
+} from './cost';
+
+export type {
+  CostConfig,
+  CostLimits,
+  CostMetrics,
+  UsageMetrics,
+  BudgetCheckResult,
+  CostRecommendation,
+  CostAlert,
+  CostAdapter,
+  CostStorage,
+  LLMProvider,
+  FallbackBehavior,
+  ModelConfig,
+  ModelPricing,
+  APICallResult,
+  TrackingOptions,
+} from './cost';
+
+// Type exports will be added here as subsequent PRs define interfaces
 // For example:
 // export type { PRState, PRComplexity, CoordinationMode } from './types';
 // export { Hub } from './hub';

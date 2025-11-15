@@ -105,6 +105,14 @@ export interface PRComplexity {
   /** Explanation of complexity assessment */
   rationale: string;
 
+  /** Breakdown of individual scoring factors */
+  factors?: {
+    fileScore: number;
+    dependencyScore: number;
+    keywordScore: number;
+    descriptionScore: number;
+  };
+
   /** Predicted file conflicts from speculative execution */
   likely_conflicts?: string[];
 
