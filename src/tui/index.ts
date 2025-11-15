@@ -422,16 +422,50 @@ export class TUIManager extends EventEmitter {
   }
 
   /**
+   * Timeout wrapper for async operations
+   */
+  private async withTimeout<T>(
+    promise: Promise<T>,
+    timeoutMs: number,
+    defaultValue: T
+  ): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((resolve) =>
+        setTimeout(() => {
+          if (this.config.debug) {
+            this.log('warning', 'tui', `Operation timed out after ${timeoutMs}ms`);
+          }
+          resolve(defaultValue);
+        }, timeoutMs)
+      ),
+    ]);
+  }
+
+  /**
    * Update status bar
    */
   private async updateStatus(): Promise<void> {
     try {
-      const agents = await this.agentRegistry.getActiveAgents();
+      // Use timeouts for all async operations to prevent freeze when hub stops
+      const agents = await this.withTimeout(
+        this.agentRegistry.getActiveAgents(),
+        2000,
+        []
+      );
       const mode = this.coordModeManager.getMode();
-      const activePRs = await this.getActivePRCount();
+      const activePRs = await this.withTimeout(
+        this.getActivePRCount(),
+        2000,
+        0
+      );
 
-      // Check hub daemon status
-      const { hubRunning, hubPid, hubLocation } = await this.checkHubStatus();
+      // Check hub daemon status (most likely to block)
+      const { hubRunning, hubPid, hubLocation } = await this.withTimeout(
+        this.checkHubStatus(),
+        2000,
+        { hubRunning: false }
+      );
 
       const state: StatusBarState = {
         mode,
@@ -448,7 +482,11 @@ export class TUIManager extends EventEmitter {
 
       // Update progress tracker if task list is loaded
       if (this.taskList.length > 0) {
-        await this.updateProgress();
+        await this.withTimeout(
+          this.updateProgress(),
+          2000,
+          undefined
+        );
       }
     } catch (error) {
       if (this.config.debug) {
