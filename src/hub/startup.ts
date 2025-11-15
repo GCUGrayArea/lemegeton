@@ -12,6 +12,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { RedisClient } from '../redis/client';
 import { ColdState } from '../types/pr';
+import { TaskListParser } from '../parser/taskList';
 
 /**
  * Task list structure (simplified for now)
@@ -88,8 +89,21 @@ export class StartupSequence {
     const taskListPath = path.join(this.workDir, 'docs', 'task-list.md');
 
     try {
-      const content = await fs.readFile(taskListPath, 'utf-8');
-      this.taskList = this.parseTaskListContent(content);
+      const parser = new TaskListParser();
+      const parsed = await parser.parse(taskListPath, false);
+
+      // Convert from parser format to startup format
+      this.taskList = {
+        prs: parsed.prs.map(pr => ({
+          id: pr.pr_id,
+          title: pr.title,
+          cold_state: pr.cold_state,
+          priority: pr.priority,
+          complexity: pr.complexity,
+          dependencies: pr.dependencies || []
+        }))
+      };
+
       console.log(`[Startup] Parsed ${this.taskList.prs.length} PRs from task-list.md`);
     } catch (error: any) {
       if (error.code === 'ENOENT') {
