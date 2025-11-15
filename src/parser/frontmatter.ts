@@ -18,17 +18,24 @@ export function extractFrontmatter(content: string): PRBlock[] {
   let inFrontmatter = false;
   let startLine = -1;
   let blockCount = 0;
+  let isPRBlock = false;
 
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
+    // Check if this is a PR header (e.g., "### PR-001: Title")
+    if (line.match(/^###\s+PR-\d+/)) {
+      isPRBlock = true;
+    }
+
     if (line.trim() === FRONTMATTER_DELIMITER) {
-      if (!inFrontmatter) {
-        // Start of frontmatter
+      if (!inFrontmatter && isPRBlock) {
+        // Start of frontmatter (only for PR blocks)
         inFrontmatter = true;
         startLine = i;
         currentBlock = [];
-      } else {
+        isPRBlock = false; // Reset flag
+      } else if (inFrontmatter) {
         // End of frontmatter
         inFrontmatter = false;
         blockCount++;
@@ -48,9 +55,9 @@ export function extractFrontmatter(content: string): PRBlock[] {
             });
           }
         } catch (error) {
-          // Skip blocks that don't parse as valid PRs (like markdown separators)
-          if (error instanceof ParseError && error.message.includes('Invalid YAML')) {
-            // Ignore - not a PR block
+          // Skip blocks that don't parse as valid PRs
+          if (error instanceof ParseError) {
+            // Ignore - not a valid PR block
           } else {
             throw error;
           }
@@ -59,6 +66,8 @@ export function extractFrontmatter(content: string): PRBlock[] {
         currentBlock = [];
         startLine = -1;
       }
+      // If we see --- but it's not after a PR header and we're not in frontmatter,
+      // it's just a markdown horizontal rule - ignore it
     } else if (inFrontmatter) {
       currentBlock.push(line);
     }
