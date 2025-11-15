@@ -68,14 +68,28 @@ async function main() {
   // Add examples to help
   program.addHelpText('after', `
 Examples:
+  # Hub Management
   lemegeton hub start           Start the hub daemon
-  lemegeton tui                 Launch Terminal UI
+  lemegeton hub stop            Stop the hub daemon
+  lemegeton hub status          Check hub status
+
+  # Terminal UI (Interactive Monitoring)
+  lemegeton tui                 Launch Terminal UI with progress tracking
+  lemegeton tui --debug         Launch TUI in debug mode
+  lemegeton tui --fps 20        Launch TUI with custom FPS
+
+  # Work Execution
   lemegeton run                 Run all available work
   lemegeton run PR-009          Run specific PR
+
+  # Status Monitoring
   lemegeton status              Show system status
   lemegeton status --watch      Watch status continuously
-  lemegeton prompt get agent-defaults
-                                Get a prompt file
+
+  # Planning & Prompts
+  lemegeton plan <spec.md>      Generate PRD and task list from spec
+  lemegeton prompt list         List all available prompts
+  lemegeton prompt get <name>   Get a prompt file
 
 For more information, visit: https://github.com/gcugrayarea/lemegeton
   `);
