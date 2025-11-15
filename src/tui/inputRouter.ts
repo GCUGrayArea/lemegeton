@@ -88,14 +88,14 @@ export class InputRouter extends EventEmitter implements TUIComponent {
     this.inputBox.on('submit', (value: string) => {
       this.handleInput(value);
       this.inputBox.clearValue();
-      this.inputBox.focus();
+      this.focus(); // Use safe focus wrapper
       this.screen.render();
     });
 
     // Handle input cancel
     this.inputBox.on('cancel', () => {
       this.inputBox.clearValue();
-      this.inputBox.focus();
+      this.focus(); // Use safe focus wrapper
       this.screen.render();
     });
 
@@ -129,8 +129,8 @@ export class InputRouter extends EventEmitter implements TUIComponent {
       this.screen.render();
     });
 
-    // Focus input by default
-    this.inputBox.focus();
+    // Don't auto-focus to prevent blessed cursor issues on Windows
+    // Users can focus with 'i' or 'enter' key bindings
   }
 
   /**
@@ -205,7 +205,12 @@ export class InputRouter extends EventEmitter implements TUIComponent {
    * Focus input
    */
   focus(): void {
-    this.inputBox.focus();
+    try {
+      this.inputBox.focus();
+    } catch (error) {
+      // Ignore focus errors - blessed can have cursor issues on Windows
+      // The input will still be usable even if focus fails
+    }
   }
 
   /**
