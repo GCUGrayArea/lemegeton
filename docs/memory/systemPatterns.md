@@ -159,6 +159,16 @@ if (this.state === RedisConnectionState.CONNECTED) {
 type Required<T> = { [K in keyof T]-?: T[K] }
 ```
 
+### Accessing Wrapped Clients
+```typescript
+// Pattern: execute() wrapper for Redis operations
+await this.redisClient.execute(async (client) => {
+  await client.set('key', 'value');
+  await client.zAdd('sorted', [{ score: 1, value: 'item' }]);
+  return await client.get('key');
+});
+```
+
 ## Async Patterns
 
 ### Background Task Management

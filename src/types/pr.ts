@@ -113,6 +113,11 @@ export interface PRComplexity {
 }
 
 /**
+ * Priority level for PR scheduling
+ */
+export type Priority = 'critical' | 'high' | 'medium' | 'low';
+
+/**
  * PR metadata parsed from task-list.md frontmatter.
  * Extends PRState with additional planning information.
  */
@@ -121,7 +126,7 @@ export interface PRMetadata extends PRState {
   title: string;
 
   /** Priority level for scheduling */
-  priority: 'critical' | 'high' | 'medium' | 'low';
+  priority: Priority;
 
   /** Detailed description of the PR */
   description: string;
