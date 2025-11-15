@@ -10,7 +10,7 @@
  */
 
 import { EventEmitter } from 'events';
-import { RedisClient } from '../redis/client';
+import { RedisClient, RedisConnectionState } from '../redis/client';
 import { RedisHealthChecker, HealthStatus } from '../redis/health';
 import { DegradedModeHandler } from './degradedMode';
 import { IsolatedModeHandler } from './isolatedMode';
@@ -162,7 +162,7 @@ export class CoordinationModeManager extends EventEmitter {
 
     try {
       // Check if connected
-      if (this.redisClient.getState() !== 'connected') {
+      if (this.redisClient.getState() !== RedisConnectionState.CONNECTED) {
         return false;
       }
 
@@ -190,7 +190,7 @@ export class CoordinationModeManager extends EventEmitter {
     try {
       // Check if we have a connection (could be local Docker)
       const state = this.redisClient.getState();
-      return state === 'connected' || state === 'connecting';
+      return state === RedisConnectionState.CONNECTED || state === RedisConnectionState.CONNECTING;
     } catch (error) {
       return false;
     }
