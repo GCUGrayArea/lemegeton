@@ -42,7 +42,7 @@ export class ActivityLog implements TUIComponent {
       tags: true,
       keys: true,
       vi: true,
-      mouse: true, // Keep mouse for wheel scrolling, but filter input
+      mouse: false, // Disable mouse to prevent escape sequences
       scrollback: 1000,
       scrollbar: {
         ch: ' ',
@@ -68,16 +68,8 @@ export class ActivityLog implements TUIComponent {
       scrollOnInput: false, // Don't scroll on random input
     });
 
-    // Enable scrolling with mouse wheel
-    this.log.on('wheeldown', () => {
-      this.log.scroll(1);
-      this.screen.render();
-    });
-
-    this.log.on('wheelup', () => {
-      this.log.scroll(-1);
-      this.screen.render();
-    });
+    // Mouse events disabled to prevent escape sequences in input
+    // Use keyboard shortcuts for scrolling: ↑↓ or j/k
 
     this.render();
   }

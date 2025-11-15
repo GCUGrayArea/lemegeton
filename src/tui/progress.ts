@@ -93,7 +93,7 @@ export class ProgressTracker implements TUIComponent {
       },
       keys: true,
       vi: true,
-      mouse: true,
+      mouse: false, // Disable mouse to prevent escape sequences
       tags: true,
     });
 

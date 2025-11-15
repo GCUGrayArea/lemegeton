@@ -105,6 +105,9 @@ export class TUIManager extends EventEmitter {
       warnings: false, // Suppress warnings
       sendFocus: true,
       ignoreLocked: ['C-c'], // Don't let widgets lock Ctrl+C
+      useBCE: true,
+      // Disable terminal mouse tracking to prevent escape sequences
+      enableMouse: false,
     });
 
     // Get theme
