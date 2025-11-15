@@ -983,7 +983,7 @@ Straightforward CLI implementation. Important for user experience.
 ---
 pr_id: PR-015
 title: Terminal UI (TUI) Implementation
-cold_state: new
+cold_state: completed
 priority: high
 complexity:
   score: 7
@@ -1013,15 +1013,38 @@ estimated_files:
 Implement single shell Terminal UI showing agent status, activity logs, and routing user input to appropriate agents.
 
 **Acceptance Criteria:**
-- [ ] Status bar shows all active agents
-- [ ] Real-time updates via Redis pub/sub
-- [ ] Activity log displays agent actions
-- [ ] Input routing to agents works
-- [ ] Coordination mode displayed
-- [ ] Clean terminal handling
+- [x] Status bar shows all active agents
+- [x] Real-time updates via Redis pub/sub
+- [x] Activity log displays agent actions
+- [x] Input routing to agents works
+- [x] Coordination mode displayed
+- [x] Clean terminal handling
 
 **Notes:**
 Complex UI requiring careful terminal handling and real-time updates. Use blessed or ink.
+
+**Implementation Details:**
+- Built with blessed + blessed-contrib for mature TUI support
+- Created 5 core components:
+  - TUIManager: Main orchestrator with lifecycle management
+  - StatusBar: Shows mode, agents, active PRs (top 3 lines)
+  - ActivityLog: Scrollable feed with 1000-entry circular buffer
+  - InputRouter: Command parsing with @agent-id syntax, command history
+  - RenderLoop: Throttled rendering (max 10 FPS)
+- Integration with existing infrastructure:
+  - MessageBus subscriptions for real-time updates
+  - AgentRegistry polling for status (1s interval)
+  - CoordinationModeManager for mode changes
+- Features:
+  - System commands: /help, /quit, /clear, /filter, /stats
+  - Direct messaging: @agent-id message
+  - Broadcast messaging: message
+  - Keyboard shortcuts: Ctrl+C/q (quit), Ctrl+L (clear), ? (help)
+  - Auto-scrolling activity log with search and filtering
+  - Color-coded agent states and message types
+- TypeScript compilation successful
+- CLI command added: `lemegeton tui`
+- Ready for integration testing with running Hub
 
 ### PR-016: Progress Tracking Display
 
