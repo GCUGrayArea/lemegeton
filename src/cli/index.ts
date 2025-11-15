@@ -11,6 +11,7 @@ import { createHubCommands } from './commands/hub';
 import { createRunCommand } from './commands/run';
 import { createStatusCommand } from './commands/status';
 import { createPlanCommand } from './commands/plan';
+import { createTUICommand } from './commands/tui';
 import { promptCommand } from './commands/prompt';
 import { formatCLIError, getExitCode } from './errors';
 
@@ -61,12 +62,14 @@ async function main() {
   program.addCommand(createRunCommand());
   program.addCommand(createStatusCommand());
   program.addCommand(createPlanCommand());
+  program.addCommand(createTUICommand());
   program.addCommand(createPromptCommands());
 
   // Add examples to help
   program.addHelpText('after', `
 Examples:
   lemegeton hub start           Start the hub daemon
+  lemegeton tui                 Launch Terminal UI
   lemegeton run                 Run all available work
   lemegeton run PR-009          Run specific PR
   lemegeton status              Show system status
