@@ -86,15 +86,26 @@ export class StatusBar implements TUIComponent {
   private buildContent(width: number): string {
     const lines: string[] = [];
 
-    // Line 1: Mode, agent count, active PRs, connection status
+    // Line 1: Hub status, Mode, agent count, active PRs, connection status
     const modeColor = getModeColor(this.state.mode, this.theme);
-    const connStatus = this.state.connected ? '{green-fg}●{/}' : '{red-fg}●{/}';
+    const redisStatus = this.state.connected ? '{green-fg}●{/}' : '{red-fg}●{/}';
+
+    // Hub status display
+    let hubStatus: string;
+    if (this.state.hubRunning) {
+      const location = this.state.hubLocation === 'remote' ? ' [Remote]' : '';
+      const pidInfo = this.state.hubPid ? ` (${this.state.hubPid})` : '';
+      hubStatus = `{green-fg}Hub: Running${location}${pidInfo}{/}`;
+    } else {
+      hubStatus = '{red-fg}Hub: Not Running{/}';
+    }
 
     const line1 = [
+      hubStatus,
       `Mode: {${modeColor}-fg}${this.state.mode.toUpperCase()}{/}`,
       `Agents: ${this.state.agents.length}/${this.state.maxAgents}`,
       `Active PRs: ${this.state.activePRs}`,
-      `${connStatus}`,
+      `Redis ${redisStatus}`,
     ].join(' │ ');
 
     lines.push(line1);

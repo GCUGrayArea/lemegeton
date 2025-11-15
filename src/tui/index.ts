@@ -7,6 +7,8 @@
 import * as blessed from 'blessed';
 import { Widgets } from 'blessed';
 import { EventEmitter } from 'events';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 import { TUIConfig, ActivityLogEntry, StatusBarState, InputCommand } from './types';
 import { StatusBar } from './statusBar';
 import { ActivityLog } from './activityLog';
@@ -25,6 +27,7 @@ import { RedisClient } from '../redis/client';
 import { TaskListParser } from '../parser/taskList';
 import { PRData } from '../parser/types';
 import { PRState } from '../types/pr';
+import { loadConfig } from '../config';
 
 /**
  * Default TUI configuration
@@ -427,12 +430,18 @@ export class TUIManager extends EventEmitter {
       const mode = this.coordModeManager.getMode();
       const activePRs = await this.getActivePRCount();
 
+      // Check hub daemon status
+      const { hubRunning, hubPid, hubLocation } = await this.checkHubStatus();
+
       const state: StatusBarState = {
         mode,
         agents,
         activePRs,
         maxAgents: 10, // TODO: Get from config
         connected: this.redisClient.isConnected(),
+        hubRunning,
+        hubPid,
+        hubLocation,
       };
 
       this.statusBar.update(state);
@@ -508,6 +517,53 @@ export class TUIManager extends EventEmitter {
     }
 
     return prSet.size;
+  }
+
+  /**
+   * Check hub daemon status
+   */
+  private async checkHubStatus(): Promise<{ hubRunning: boolean; hubPid?: number; hubLocation?: 'local' | 'remote' }> {
+    try {
+      const pidFile = path.join(process.cwd(), '.lemegeton', 'hub.pid');
+      const pidContent = await fs.readFile(pidFile, 'utf-8');
+      const pid = parseInt(pidContent.trim(), 10);
+
+      if (isNaN(pid)) {
+        return { hubRunning: false };
+      }
+
+      // Check if process is running
+      try {
+        process.kill(pid, 0);
+        // Process exists, it's local
+        return { hubRunning: true, hubPid: pid, hubLocation: 'local' };
+      } catch {
+        // Process doesn't exist, clean up stale PID file
+        await fs.unlink(pidFile).catch(() => {});
+        return { hubRunning: false };
+      }
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        // No PID file, check if hub might be remote by checking Redis
+        // If we're connected to Redis but no local PID, assume remote
+        if (this.redisClient.isConnected()) {
+          const config = loadConfig();
+          const isRemoteRedis = config.redis?.url && !config.redis.url.includes('localhost') && !config.redis.url.includes('127.0.0.1');
+          if (isRemoteRedis) {
+            // Remote Redis suggests remote hub - check if hub is actually running by trying to read hub status from Redis
+            try {
+              const hubStatus = await this.redisClient.execute(client => client.get('hub:status'));
+              if (hubStatus) {
+                return { hubRunning: true, hubLocation: 'remote' };
+              }
+            } catch {
+              // Can't check remote hub status
+            }
+          }
+        }
+      }
+      return { hubRunning: false };
+    }
   }
 
   /**

@@ -76,6 +76,15 @@ export interface StatusBarState {
   /** Connection status */
   connected: boolean;
 
+  /** Hub daemon running status */
+  hubRunning?: boolean;
+
+  /** Hub daemon PID */
+  hubPid?: number;
+
+  /** Hub location (local or remote) */
+  hubLocation?: 'local' | 'remote';
+
   /** Additional stats */
   stats?: {
     messagesPerSecond?: number;
