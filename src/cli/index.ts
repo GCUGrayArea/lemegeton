@@ -3,105 +3,86 @@
  * Lemegeton CLI
  *
  * Main entry point for the lemegeton command-line interface.
- * Provides subcommands for hub management, prompt access, and configuration.
+ * Provides comprehensive command structure using Commander.js.
  */
 
+import { Command } from 'commander';
+import { createHubCommands } from './commands/hub';
+import { createRunCommand } from './commands/run';
+import { createStatusCommand } from './commands/status';
+import { createPlanCommand } from './commands/plan';
 import { promptCommand } from './commands/prompt';
+import { formatCLIError, getExitCode } from './errors';
 
 /**
- * Parse command-line arguments and route to appropriate handler.
+ * Get package version
+ */
+function getVersion(): string {
+  const packageJson = require('../../package.json');
+  return packageJson.version;
+}
+
+/**
+ * Create prompt commands (legacy wrapper for Commander.js)
+ */
+function createPromptCommands(): Command {
+  const prompt = new Command('prompt')
+    .description('Access and manage prompts');
+
+  prompt.command('get <name>')
+    .description('Get a prompt by name (outputs YAML)')
+    .action(async (name) => {
+      await promptCommand(['get', name]);
+    });
+
+  prompt.command('list')
+    .description('List all available prompts')
+    .action(async () => {
+      await promptCommand(['list']);
+    });
+
+  return prompt;
+}
+
+/**
+ * Main CLI entry point
  */
 async function main() {
-  const args = process.argv.slice(2);
+  const program = new Command();
 
-  if (args.length === 0) {
-    showUsage();
-    process.exit(0);
-  }
+  program
+    .name('lemegeton')
+    .description('Multi-agent task orchestration system')
+    .version(getVersion(), '-v, --version', 'Show version information')
+    .helpOption('-h, --help', 'Show help');
 
-  const command = args[0];
+  // Add command groups
+  program.addCommand(createHubCommands());
+  program.addCommand(createRunCommand());
+  program.addCommand(createStatusCommand());
+  program.addCommand(createPlanCommand());
+  program.addCommand(createPromptCommands());
 
-  try {
-    switch (command) {
-      case 'prompt':
-        await promptCommand(args.slice(1));
-        break;
-
-      case 'hub':
-        console.error('Hub management not yet implemented');
-        process.exit(1);
-        break;
-
-      case 'config':
-        console.error('Configuration management not yet implemented');
-        process.exit(1);
-        break;
-
-      case 'help':
-      case '--help':
-      case '-h':
-        showUsage();
-        process.exit(0);
-        break;
-
-      case 'version':
-      case '--version':
-      case '-v':
-        showVersion();
-        process.exit(0);
-        break;
-
-      default:
-        console.error(`Unknown command: ${command}`);
-        showUsage();
-        process.exit(1);
-    }
-  } catch (error) {
-    if (error instanceof Error) {
-      console.error(`Error: ${error.message}`);
-    } else {
-      console.error('An unknown error occurred');
-    }
-    process.exit(1);
-  }
-}
-
-/**
- * Display usage information.
- */
-function showUsage() {
-  console.log(`
-Lemegeton - Agent Orchestration Framework
-
-Usage:
-  npx lemegeton <command> [options]
-
-Commands:
-  prompt <subcommand>    Access and manage prompts
-  hub <subcommand>       Manage the Hub coordinator (not yet implemented)
-  config <subcommand>    Manage configuration (not yet implemented)
-  help                   Show this help message
-  version                Show version information
-
-Prompt Commands:
-  prompt get <name>      Get a prompt by name (outputs YAML)
-  prompt list            List all available prompts
-
+  // Add examples to help
+  program.addHelpText('after', `
 Examples:
-  npx lemegeton prompt get agent-defaults
-  npx lemegeton prompt list
+  lemegeton hub start           Start the hub daemon
+  lemegeton run                 Run all available work
+  lemegeton run PR-009          Run specific PR
+  lemegeton status              Show system status
+  lemegeton status --watch      Watch status continuously
+  lemegeton prompt get agent-defaults
+                                Get a prompt file
 
 For more information, visit: https://github.com/gcugrayarea/lemegeton
-  `.trim());
-}
+  `);
 
-/**
- * Display version information.
- */
-function showVersion() {
-  // Import version from package.json
-  const packageJson = require('../../package.json');
-  console.log(`Lemegeton v${packageJson.version}`);
+  try {
+    await program.parseAsync(process.argv);
+  } catch (error) {
+    console.error(formatCLIError(error as Error));
+    process.exit(getExitCode(error as Error));
+  }
 }
 
 // Run main function

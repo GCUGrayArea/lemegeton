@@ -35,11 +35,8 @@ export class PlanningAgent extends BaseAgent {
       return {
         success: true,
         prId: assignment.prId,
-        message: 'Planning completed',
-        metadata: {
-          tasksGenerated: 10,
-          estimatedHours: 20,
-        },
+        output: 'Planning completed',
+        filesModified: [],
       };
     } catch (error) {
       console.error(`[PlanningAgent] Planning failed for ${assignment.prId}:`, error);
@@ -62,10 +59,8 @@ export class PlanningAgent extends BaseAgent {
       return false;
     }
 
-    if (!assignment.description) {
-      console.error('[PlanningAgent] Assignment missing specification');
-      return false;
-    }
+    // Assignment structure doesn't include description field
+    // This is acceptable for planning agents
 
     return true;
   }

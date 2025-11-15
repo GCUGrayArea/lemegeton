@@ -35,12 +35,7 @@ export class ReviewAgent extends BaseAgent {
       return {
         success: true,
         prId: assignment.prId,
-        message: 'Review completed',
-        metadata: {
-          reviewComments: 2,
-          issuesFound: 0,
-          approved: true,
-        },
+        output: 'Review completed - approved with 2 comments',
       };
     } catch (error) {
       console.error(`[ReviewAgent] Review failed for PR ${assignment.prId}:`, error);

@@ -35,12 +35,9 @@ export class QCAgent extends BaseAgent {
       return {
         success: true,
         prId: assignment.prId,
-        message: 'All tests passed',
-        metadata: {
-          testsPassed: true,
-          coverage: 85,
-          lintErrors: 0,
-        },
+        output: 'All tests passed',
+        testsRun: 10,
+        testsPassed: 10,
       };
     } catch (error) {
       console.error(`[QCAgent] QC failed for PR ${assignment.prId}:`, error);

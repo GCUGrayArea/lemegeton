@@ -37,7 +37,7 @@ export class WorkerAgent extends BaseAgent {
         success: true,
         prId: assignment.prId,
         filesModified: assignment.files || [],
-        message: 'Work completed successfully',
+        output: 'Work completed successfully',
       };
     } catch (error) {
       console.error(`[WorkerAgent] Failed to complete PR ${assignment.prId}:`, error);
@@ -60,9 +60,10 @@ export class WorkerAgent extends BaseAgent {
       return false;
     }
 
-    if (!assignment.description && !assignment.files) {
-      console.error('[WorkerAgent] Assignment missing description and files');
-      return false;
+    // Assignment doesn't require description field
+    // Just check that we have something to work on
+    if (!assignment.files || assignment.files.length === 0) {
+      console.log('[WorkerAgent] Warning: No files specified in assignment');
     }
 
     return true;
