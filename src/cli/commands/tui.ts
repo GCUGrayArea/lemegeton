@@ -62,11 +62,12 @@ export function createTUICommand(): Command {
         }
 
         // Windows-specific: Enable Ctrl+C handling
+        // Note: Raw mode can cause mouse events to appear as escape sequences
+        // Blessed handles this, but we need to be careful with input handling
         if (process.platform === 'win32' && process.stdin.isTTY) {
           require('readline').emitKeypressEvents(process.stdin);
-          if (process.stdin.setRawMode) {
-            process.stdin.setRawMode(true);
-          }
+          // Don't enable raw mode here - blessed will handle it
+          // Raw mode was causing mouse movements to appear as random characters
         }
 
         // Handle errors

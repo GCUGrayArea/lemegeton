@@ -42,7 +42,7 @@ export class ActivityLog implements TUIComponent {
       tags: true,
       keys: true,
       vi: true,
-      mouse: true,
+      mouse: true, // Keep mouse for wheel scrolling, but filter input
       scrollback: 1000,
       scrollbar: {
         ch: ' ',
@@ -64,6 +64,8 @@ export class ActivityLog implements TUIComponent {
         },
       },
       label: ' Activity Log (↑↓ to scroll, / to search, f to filter) ',
+      alwaysScroll: true,
+      scrollOnInput: false, // Don't scroll on random input
     });
 
     // Enable scrolling with mouse wheel

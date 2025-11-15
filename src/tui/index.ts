@@ -103,6 +103,8 @@ export class TUIManager extends EventEmitter {
       fullUnicode: true,
       grabKeys: true, // Ensure keyboard events are captured
       warnings: false, // Suppress warnings
+      sendFocus: true,
+      ignoreLocked: ['C-c'], // Don't let widgets lock Ctrl+C
     });
 
     // Get theme

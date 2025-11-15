@@ -55,7 +55,7 @@ export class InputRouter extends EventEmitter implements TUIComponent {
       height: 1,
       inputOnFocus: true,
       keys: true,
-      mouse: true,
+      mouse: false, // Disable mouse to prevent escape sequences in raw mode
       style: {
         fg: this.theme.fg,
         bg: this.theme.bg,
