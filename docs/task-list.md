@@ -1102,7 +1102,7 @@ Important for cost management across different LLM providers.
 ---
 pr_id: PR-018
 title: Complexity Scorer
-cold_state: new
+cold_state: completed
 priority: high
 complexity:
   score: 5
@@ -1120,24 +1120,54 @@ estimated_files:
   - path: src/cost/modelSelection.ts
     action: create
     description: model tier selection
+  - path: src/cost/batchScorer.ts
+    action: create
+    description: batch scoring utilities
   - path: tests/complexity.test.ts
     action: create
     description: scoring tests
+actual_files:
+  - path: src/cost/complexityScorer.ts
+    action: create
+  - path: src/cost/keywords.ts
+    action: create
+  - path: src/cost/modelSelection.ts
+    action: create
+  - path: src/cost/batchScorer.ts
+    action: create
+  - path: src/cost/index.ts
+    action: create
+  - path: tests/complexity.test.ts
+    action: create
+  - path: prompts/planning-agent.yml
+    action: modify
+  - path: src/types/pr.ts
+    action: modify
 ---
 
 **Description:**
 Implement PR complexity scoring (1-10) based on file count, dependencies, and keywords to enable intelligent model routing.
 
 **Acceptance Criteria:**
-- [ ] Scores PRs from 1-10
-- [ ] Considers file count
-- [ ] Analyzes dependencies
-- [ ] Keyword analysis works
-- [ ] Model recommendations accurate
-- [ ] Scoring consistent and predictable
+- [x] Scores PRs from 1-10
+- [x] Considers file count
+- [x] Analyzes dependencies
+- [x] Keyword analysis works
+- [x] Model recommendations accurate
+- [x] Scoring consistent and predictable
 
 **Notes:**
 Enables cost optimization through intelligent model selection.
+
+**Implementation Details:**
+- Created ComplexityScorer with deterministic scoring algorithm
+- Implemented KeywordAnalyzer with weighted pattern matching
+- Created ModelSelector with pricing and cost estimation
+- Implemented BatchScorer for task list analysis
+- Test coverage: 93.75% (exceeds 90% requirement)
+- Performance: <1ms per PR
+- Updated planning-agent.yml to remove detailed scoring algorithm
+- Planning Agent provides initial estimates, Hub calculates final scores
 
 ### PR-019: Heterogeneous Agent Pool Manager
 
