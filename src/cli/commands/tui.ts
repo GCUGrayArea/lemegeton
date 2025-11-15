@@ -46,13 +46,28 @@ export function createTUICommand(): Command {
         // Handle process termination
         const cleanup = async () => {
           console.log('\nShutting down TUI...');
-          await tui.stop();
+          try {
+            await tui.stop();
+          } catch (error) {
+            // Ignore errors during shutdown
+          }
           process.exit(0);
         };
 
+        // Unix-style signals
         process.on('SIGINT', cleanup);
         process.on('SIGTERM', cleanup);
-        process.on('SIGHUP', cleanup);
+        if (process.platform !== 'win32') {
+          process.on('SIGHUP', cleanup);
+        }
+
+        // Windows-specific: Enable Ctrl+C handling
+        if (process.platform === 'win32' && process.stdin.isTTY) {
+          require('readline').emitKeypressEvents(process.stdin);
+          if (process.stdin.setRawMode) {
+            process.stdin.setRawMode(true);
+          }
+        }
 
         // Handle errors
         tui.on('error', (error) => {

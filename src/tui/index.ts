@@ -98,6 +98,8 @@ export class TUIManager extends EventEmitter {
       },
       dockBorders: true,
       fullUnicode: true,
+      grabKeys: true, // Ensure keyboard events are captured
+      warnings: false, // Suppress warnings
     });
 
     // Get theme
@@ -247,6 +249,14 @@ export class TUIManager extends EventEmitter {
   private setupKeyBindings(): void {
     // Quit on Ctrl+C or q
     this.screen.key(['C-c', 'q'], async () => {
+      this.log('info', 'tui', 'Shutting down...');
+      await this.stop();
+      process.exit(0);
+    });
+
+    // Additional fallback for Ctrl+C (works better on Windows)
+    this.screen.key(['escape', 'escape'], async () => {
+      this.log('info', 'tui', 'Double-ESC detected, shutting down...');
       await this.stop();
       process.exit(0);
     });
@@ -545,7 +555,8 @@ export class TUIManager extends EventEmitter {
       '  message            Broadcast to all agents',
       '',
       'Keyboard Shortcuts:',
-      '  Ctrl+C, q         Quit',
+      '  Ctrl+C, q         Quit TUI',
+      '  ESC ESC           Quit TUI (fallback for Windows)',
       '  Ctrl+L            Clear log',
       '  ?                  Show help',
       '  p                  Toggle progress panel',
