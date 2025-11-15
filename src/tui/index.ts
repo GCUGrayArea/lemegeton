@@ -475,8 +475,11 @@ export class TUIManager extends EventEmitter {
       return;
     }
 
-    const width = this.screen.width;
-    const height = this.screen.height;
+    const width = this.screen.width as number;
+    const height = this.screen.height as number;
+
+    const progressWidget = this.progressTracker.getWidget() as any;
+    const logWidget = this.activityLog.getWidget() as any;
 
     if (this.progressVisible) {
       // Split layout: progress panel on left, activity log on right
@@ -485,15 +488,15 @@ export class TUIManager extends EventEmitter {
         Math.min(Math.floor(width * 0.4), 40)
       );
 
-      this.progressTracker.getWidget().width = progressWidth;
-      this.progressTracker.getWidget().height = height - 6;
+      progressWidget.width = progressWidth;
+      progressWidget.height = height - 6;
 
-      this.activityLog.getWidget().left = progressWidth;
-      this.activityLog.getWidget().width = width - progressWidth;
+      logWidget.left = progressWidth;
+      logWidget.width = width - progressWidth;
     } else {
       // Full width activity log
-      this.activityLog.getWidget().left = 0;
-      this.activityLog.getWidget().width = width;
+      logWidget.left = 0;
+      logWidget.width = width;
     }
 
     this.renderLoop.forceRender();

@@ -68,7 +68,7 @@ export class ProgressTracker implements TUIComponent {
       top: 3,
       left: 0,
       width: '30%',
-      height: screen.height - 6,
+      height: (screen.height as number) - 6,
       label: ' Progress ',
       border: {
         type: 'line',
