@@ -29,6 +29,12 @@ export interface TUIConfig {
 
   /** Redis URL for pub/sub */
   redisUrl?: string;
+
+  /** Path to task list file (default: 'docs/task-list.md') */
+  taskListPath?: string;
+
+  /** Show progress panel by default (default: true) */
+  showProgress?: boolean;
 }
 
 /**

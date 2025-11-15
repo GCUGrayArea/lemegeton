@@ -15,11 +15,13 @@ export function createTUICommand(): Command {
   const command = new Command('tui');
 
   command
-    .description('Launch Terminal UI for monitoring agents')
+    .description('Launch interactive Terminal UI with progress tracking, dependency visualization, and real-time monitoring')
     .option('-r, --redis-url <url>', 'Redis connection URL')
     .option('--fps <number>', 'Maximum FPS for rendering (default: 10)', parseInt)
     .option('--buffer <size>', 'Activity log buffer size (default: 1000)', parseInt)
     .option('--theme <theme>', 'Color theme (dark/light/auto)', 'auto')
+    .option('--task-list <path>', 'Path to task list file (default: docs/task-list.md)')
+    .option('--no-progress', 'Hide progress panel')
     .option('--debug', 'Enable debug mode')
     .action(async (options) => {
       try {
@@ -32,6 +34,8 @@ export function createTUICommand(): Command {
           maxFPS: options.fps || 10,
           logBufferSize: options.buffer || 1000,
           theme: options.theme || 'auto',
+          taskListPath: options.taskList || 'docs/task-list.md',
+          showProgress: options.progress !== false, // Default true unless --no-progress
           debug: options.debug || false,
         });
 

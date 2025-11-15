@@ -12,6 +12,9 @@ import { StatusBar } from './statusBar';
 import { ActivityLog } from './activityLog';
 import { InputRouter } from './inputRouter';
 import { RenderLoop } from './render';
+import { ProgressTracker, ProgressState } from './progress';
+import { DependencyGraph } from './dependencies';
+import { MetricsCalculator } from './metrics';
 import { getTheme } from './themes';
 import { debounce } from './utils';
 import { MessageBus } from '../communication/messageBus';
@@ -19,6 +22,9 @@ import { MessageType } from '../communication/types';
 import { AgentRegistry } from '../hub/agentRegistry';
 import { CoordinationModeManager } from '../core/coordinationMode';
 import { RedisClient } from '../redis/client';
+import { TaskListParser } from '../parser/taskList';
+import { PRData } from '../parser/types';
+import { PRState } from '../types/pr';
 
 /**
  * Default TUI configuration
@@ -30,6 +36,8 @@ const DEFAULT_CONFIG: Required<TUIConfig> = {
   debug: false,
   theme: 'auto',
   redisUrl: 'redis://localhost:6379',
+  taskListPath: 'docs/task-list.md',
+  showProgress: true,
 };
 
 /**
@@ -42,10 +50,17 @@ export class TUIManager extends EventEmitter {
   private activityLog!: ActivityLog;
   private inputRouter!: InputRouter;
   private renderLoop!: RenderLoop;
+  private progressTracker!: ProgressTracker;
   private messageBus!: MessageBus;
   private agentRegistry!: AgentRegistry;
   private coordModeManager!: CoordinationModeManager;
   private redisClient!: RedisClient;
+  private taskListParser!: TaskListParser;
+  private dependencyGraph!: DependencyGraph;
+  private metricsCalculator!: MetricsCalculator;
+  private taskList: PRData[] = [];
+  private progressVisible: boolean = true;
+  private expandedPRs: Set<string> = new Set();
   private running: boolean = false;
   private updateInterval: NodeJS.Timeout | null = null;
 
@@ -98,6 +113,24 @@ export class TUIManager extends EventEmitter {
     this.inputRouter = new InputRouter(theme);
     this.inputRouter.init(this.screen);
 
+    // Initialize task list parser and load task list
+    this.taskListParser = new TaskListParser();
+    try {
+      const parsed = await this.taskListParser.parse(this.config.taskListPath);
+      this.taskList = parsed.prs;
+      this.dependencyGraph = new DependencyGraph(this.taskList);
+      this.metricsCalculator = new MetricsCalculator(this.taskList, new Map());
+    } catch (error) {
+      this.log('warning', 'tui', `Failed to load task list: ${error}`);
+      // Continue without task list
+    }
+
+    // Initialize progress tracker
+    this.progressTracker = new ProgressTracker(theme);
+    this.progressTracker.init(this.screen);
+    this.progressVisible = this.config.showProgress;
+    this.progressTracker.setVisible(this.progressVisible);
+
     // Initialize render loop
     this.renderLoop = new RenderLoop(this.screen, this.config.maxFPS);
 
@@ -106,6 +139,9 @@ export class TUIManager extends EventEmitter {
 
     // Set up key bindings
     this.setupKeyBindings();
+
+    // Set up initial layout
+    this.updateLayout();
 
     // Log initialization
     this.log('info', 'hub', 'TUI initialized');
@@ -165,6 +201,7 @@ export class TUIManager extends EventEmitter {
     this.statusBar.destroy();
     this.activityLog.destroy();
     this.inputRouter.destroy();
+    this.progressTracker.destroy();
 
     // Destroy screen
     this.screen.destroy();
@@ -199,6 +236,7 @@ export class TUIManager extends EventEmitter {
 
     // Screen events
     this.screen.on('resize', debounce(() => {
+      this.updateLayout();
       this.renderLoop.forceRender();
     }, 100));
   }
@@ -232,6 +270,22 @@ export class TUIManager extends EventEmitter {
     // Escape to blur input
     this.screen.key(['escape'], () => {
       this.screen.focusNext();
+    });
+
+    // Toggle progress panel on 'p'
+    this.screen.key(['p'], () => {
+      this.progressVisible = !this.progressVisible;
+      this.progressTracker.setVisible(this.progressVisible);
+      this.updateLayout();
+      this.log('info', 'tui', `Progress panel ${this.progressVisible ? 'shown' : 'hidden'}`);
+    });
+
+    // Expand/collapse dependency tree on 'e'
+    this.screen.key(['e'], () => {
+      const focusedPR = this.progressTracker.getFocusedPR();
+      if (focusedPR) {
+        this.progressTracker.toggleExpansion(focusedPR);
+      }
     });
   }
 
@@ -372,11 +426,80 @@ export class TUIManager extends EventEmitter {
       };
 
       this.statusBar.update(state);
+
+      // Update progress tracker if task list is loaded
+      if (this.taskList.length > 0) {
+        await this.updateProgress();
+      }
     } catch (error) {
       if (this.config.debug) {
         this.log('error', 'tui', `Failed to update status: ${error}`);
       }
     }
+  }
+
+  /**
+   * Update progress tracker
+   */
+  private async updateProgress(): Promise<void> {
+    try {
+      const prStates = await this.getAllPRStates();
+
+      // Update metrics calculator
+      if (this.metricsCalculator) {
+        this.metricsCalculator.updateStates(prStates);
+      }
+
+      // Update progress tracker
+      const progressState: ProgressState = {
+        allPRs: this.taskList,
+        prStates,
+        dependencies: this.dependencyGraph.getDependencyMap(),
+        expandedPRs: this.expandedPRs,
+        scrollOffset: 0,
+      };
+
+      this.progressTracker.update(progressState);
+    } catch (error) {
+      if (this.config.debug) {
+        this.log('error', 'tui', `Failed to update progress: ${error}`);
+      }
+    }
+  }
+
+  /**
+   * Update layout (split-pane or full-width)
+   */
+  private updateLayout(): void {
+    if (!this.screen) {
+      return;
+    }
+
+    const width = this.screen.width as number;
+    const height = this.screen.height as number;
+
+    const progressWidget = this.progressTracker.getWidget() as any;
+    const logWidget = this.activityLog.getWidget() as any;
+
+    if (this.progressVisible) {
+      // Split layout: progress panel on left, activity log on right
+      const progressWidth = Math.max(
+        Math.floor(width * 0.25),
+        Math.min(Math.floor(width * 0.4), 40)
+      );
+
+      progressWidget.width = progressWidth;
+      progressWidget.height = height - 6;
+
+      logWidget.left = progressWidth;
+      logWidget.width = width - progressWidth;
+    } else {
+      // Full width activity log
+      logWidget.left = 0;
+      logWidget.width = width;
+    }
+
+    this.renderLoop.forceRender();
   }
 
   /**
@@ -394,6 +517,30 @@ export class TUIManager extends EventEmitter {
     }
 
     return prSet.size;
+  }
+
+  /**
+   * Get all PR states from Redis
+   */
+  private async getAllPRStates(): Promise<Map<string, PRState>> {
+    const states = new Map<string, PRState>();
+
+    // Get PR states from task list and Redis
+    for (const pr of this.taskList) {
+      // For now, use the cold state from task list
+      // In a real implementation, this would query Redis/StateSync
+      const state: PRState = {
+        pr_id: pr.pr_id,
+        cold_state: pr.cold_state,
+        dependencies: pr.dependencies || [],
+        files_locked: [],
+        last_transition: new Date().toISOString(),
+      };
+
+      states.set(pr.pr_id, state);
+    }
+
+    return states;
   }
 
   /**
@@ -420,9 +567,12 @@ export class TUIManager extends EventEmitter {
       '  Ctrl+C, q         Quit',
       '  Ctrl+L            Clear log',
       '  ?                  Show help',
+      '  p                  Toggle progress panel',
+      '  e                  Expand/collapse dependencies',
       '  i, Enter           Focus input',
       '  Escape             Unfocus input',
       '  ↑↓                 Scroll log or command history',
+      '  PageUp/PageDown    Scroll progress panel',
     ];
 
     for (const line of help) {
@@ -489,4 +639,7 @@ export { StatusBar } from './statusBar';
 export { ActivityLog } from './activityLog';
 export { InputRouter } from './inputRouter';
 export { RenderLoop } from './render';
+export { ProgressTracker } from './progress';
+export { DependencyGraph } from './dependencies';
+export { MetricsCalculator, MetricsFormatter } from './metrics';
 export * from './types';
