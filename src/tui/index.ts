@@ -475,29 +475,10 @@ export class TUIManager extends EventEmitter {
       return;
     }
 
-    const width = this.screen.width as number;
-    const height = this.screen.height as number;
-
-    const progressWidget = this.progressTracker.getWidget() as any;
-    const logWidget = this.activityLog.getWidget() as any;
-
-    if (this.progressVisible) {
-      // Split layout: progress panel on left, activity log on right
-      const progressWidth = Math.max(
-        Math.floor(width * 0.25),
-        Math.min(Math.floor(width * 0.4), 40)
-      );
-
-      progressWidget.width = progressWidth;
-      progressWidget.height = height - 6;
-
-      logWidget.left = progressWidth;
-      logWidget.width = width - progressWidth;
-    } else {
-      // Full width activity log
-      logWidget.left = 0;
-      logWidget.width = width;
-    }
+    // Simply show/hide the progress panel
+    // The widgets maintain their original positioning which is more stable
+    // and doesn't cause circular dependency issues in blessed's coordinate system
+    this.progressTracker.setVisible(this.progressVisible);
 
     this.renderLoop.forceRender();
   }

@@ -32,11 +32,12 @@ export class ActivityLog implements TUIComponent {
     this.screen = screen;
 
     // Create scrollable log widget
+    // Positioned to the right of the progress panel (30% width)
     this.log = blessed.log({
       parent: screen,
       top: 3, // Below status bar
-      left: 0,
-      width: '100%',
+      left: '30%', // Position after progress panel
+      width: '70%', // Take remaining width
       height: '100%-6', // Leave space for status bar and input
       tags: true,
       keys: true,
