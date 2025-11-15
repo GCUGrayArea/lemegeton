@@ -232,9 +232,23 @@ export class Hub extends EventEmitter {
       appConfig.redis?.url || this.config.redis.url
     );
 
-    // Connect if not already connected
-    if (this.redisClient.getState() !== RedisConnectionState.CONNECTED) {
-      await this.redisClient.connect();
+    // Try to connect with auto-spawn fallback if enabled
+    if (this.config.redis.autoSpawn) {
+      const { getDefaultAutoSpawner } = await import('../redis/autoSpawn');
+      const spawner = getDefaultAutoSpawner(this.redisClient);
+
+      try {
+        await spawner.connectWithFallback(this.redisClient);
+        console.log('[Hub] Connected to Redis (auto-spawn enabled)');
+      } catch (error) {
+        console.error('[Hub] Failed to connect to Redis even with auto-spawn:', error);
+        throw error;
+      }
+    } else {
+      // Connect directly without auto-spawn
+      if (this.redisClient.getState() !== RedisConnectionState.CONNECTED) {
+        await this.redisClient.connect();
+      }
     }
   }
 
