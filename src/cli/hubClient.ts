@@ -146,7 +146,7 @@ export class HubClient {
    * Spawn daemon process
    */
   private async spawnDaemon(options: HubStartOptions): Promise<number> {
-    const scriptPath = path.join(__dirname, '..', 'hub', 'daemon.js');
+    const scriptPath = path.join(__dirname, '..', 'hub', 'daemonEntry.js');
     const logFile = path.join(this.workDir, '.lemegeton', 'hub.log');
 
     // Open log file
