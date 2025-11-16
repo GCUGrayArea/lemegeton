@@ -9,10 +9,6 @@ import express, { Request, Response } from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { RedisClient } from '../redis/client';
-import { RedisHealthChecker } from '../redis/health';
-import { MessageBus } from '../communication/messageBus';
-import { CoordinationModeManager } from '../core/coordinationMode';
-import { getConfig } from '../config';
 import * as path from 'path';
 
 export interface DashboardServerConfig {
@@ -37,13 +33,11 @@ export class DashboardServer {
   private app: express.Application;
   private httpServer: ReturnType<typeof createServer>;
   private wss: WebSocketServer;
-  private redisClient: RedisClient;
-  private healthChecker: RedisHealthChecker | null = null;
-  private messageBus: MessageBus | null = null;
-  private modeManager: CoordinationModeManager | null = null;
+  private redisClient: RedisClient | null = null;
   private clients: Map<string, ClientState> = new Map();
   private config: Required<DashboardServerConfig>;
   private updateInterval: NodeJS.Timeout | null = null;
+  private isRedisConnected = false;
 
   constructor(config: DashboardServerConfig = {}) {
     // Resolve static path relative to project root
@@ -62,9 +56,6 @@ export class DashboardServer {
     // Setup WebSocket server
     this.wss = new WebSocketServer({ server: this.httpServer });
 
-    // Setup Redis
-    this.redisClient = new RedisClient();
-
     this.setupRoutes();
     this.setupWebSocket();
   }
@@ -80,7 +71,7 @@ export class DashboardServer {
     this.app.get('/api/health', (req: Request, res: Response) => {
       res.json({
         status: 'ok',
-        redis: this.redisClient.isConnected(),
+        redis: this.isRedisConnected,
         clients: this.clients.size,
         uptime: process.uptime(),
       });
@@ -148,28 +139,20 @@ export class DashboardServer {
    */
   async start(): Promise<void> {
     try {
-      // Connect to Redis
-      await this.redisClient.connect();
-      console.log('[Dashboard] Connected to Redis');
-
-      // Create health checker and mode manager
+      // Try to connect to Redis (optional)
       try {
-        this.healthChecker = new RedisHealthChecker(this.redisClient);
-        this.modeManager = new CoordinationModeManager(
-          this.redisClient,
-          this.healthChecker
-        );
-        await this.modeManager.start();
+        this.redisClient = new RedisClient();
+        await this.redisClient.connect();
+        this.isRedisConnected = true;
+        console.log('[Dashboard] Connected to Redis');
+
+        // Subscribe to Redis channels for live updates
+        await this.subscribeToRedisChannels();
       } catch (error) {
-        console.warn('[Dashboard] Running without coordination mode manager:', error);
+        console.warn('[Dashboard] Running without Redis connection:', error);
+        console.warn('[Dashboard] Dashboard will work but without live data from hub');
+        this.isRedisConnected = false;
       }
-
-      // Create message bus
-      this.messageBus = new MessageBus(this.redisClient, this.modeManager!, {});
-      await this.messageBus.start();
-
-      // Subscribe to relevant channels
-      await this.subscribeToChannels();
 
       // Start periodic state updates
       this.startPeriodicUpdates();
@@ -206,18 +189,10 @@ export class DashboardServer {
     // Close WebSocket server
     this.wss.close();
 
-    // Stop mode manager
-    if (this.modeManager) {
-      await this.modeManager.stop();
-    }
-
-    // Stop message bus
-    if (this.messageBus) {
-      await this.messageBus.stop();
-    }
-
     // Disconnect Redis
-    await this.redisClient.disconnect();
+    if (this.redisClient) {
+      await this.redisClient.disconnect();
+    }
 
     // Close HTTP server
     await new Promise<void>((resolve) => {
@@ -230,40 +205,41 @@ export class DashboardServer {
   /**
    * Subscribe to Redis channels for updates
    */
-  private async subscribeToChannels(): Promise<void> {
-    if (!this.messageBus) return;
+  private async subscribeToRedisChannels(): Promise<void> {
+    if (!this.redisClient || !this.isRedisConnected) return;
 
-    // Subscribe to hub broadcasts
-    await this.messageBus.subscribe('hub-broadcast', (message) => {
-      this.broadcastToClients({
-        type: 'hub-message',
-        data: message,
+    try {
+      // Subscribe to hub broadcasts
+      await this.redisClient.subscribe('hub-broadcast', (message: string) => {
+        try {
+          const data = JSON.parse(message);
+          this.broadcastToClients({
+            type: 'hub-message',
+            data,
+          });
+        } catch (error) {
+          console.error('[Dashboard] Failed to parse hub message:', error);
+        }
       });
-    });
 
-    // Subscribe to TUI updates (if available)
-    await this.messageBus.subscribe('tui-updates', (message) => {
-      this.broadcastToClients({
-        type: 'tui-update',
-        data: message,
+      // Subscribe to agent updates
+      await this.redisClient.pSubscribe('agent:*', (channel: string, message: string) => {
+        try {
+          const data = JSON.parse(message);
+          this.broadcastToClients({
+            type: 'agent-update',
+            channel,
+            data,
+          });
+        } catch (error) {
+          console.error('[Dashboard] Failed to parse agent update:', error);
+        }
       });
-    });
 
-    // Subscribe to agent updates
-    await this.redisClient.pSubscribe('agent:*', (channel: string, message: string) => {
-      try {
-        const data = JSON.parse(message);
-        this.broadcastToClients({
-          type: 'agent-update',
-          channel,
-          data,
-        });
-      } catch (error) {
-        console.error('[Dashboard] Failed to parse agent update:', error);
-      }
-    });
-
-    console.log('[Dashboard] Subscribed to Redis channels');
+      console.log('[Dashboard] Subscribed to Redis channels');
+    } catch (error) {
+      console.error('[Dashboard] Failed to subscribe to channels:', error);
+    }
   }
 
   /**
@@ -283,10 +259,26 @@ export class DashboardServer {
    */
   private async getCurrentState(): Promise<any> {
     try {
-      const client = this.redisClient.getClient();
+      if (!this.redisClient || !this.isRedisConnected) {
+        return {
+          timestamp: Date.now(),
+          mode: 'DISCONNECTED',
+          redis: {
+            connected: false,
+            state: 'disconnected',
+          },
+          agents: {
+            active: 0,
+            details: {},
+          },
+          prs: {
+            total: 0,
+            details: {},
+          },
+        };
+      }
 
-      // Get coordination mode
-      const mode = this.modeManager?.getMode() || 'UNKNOWN';
+      const client = this.redisClient.getClient();
 
       // Get agent registry
       const agentsData = await client.get('agents:registry');
@@ -296,14 +288,15 @@ export class DashboardServer {
       const prsData = await client.get('state:prs');
       const prs = prsData ? JSON.parse(prsData) : {};
 
-      // Get message bus stats
-      const messageBusStats = this.messageBus?.getStats() || null;
+      // Get coordination mode
+      const modeData = await client.get('coordination:mode');
+      const mode = modeData || 'UNKNOWN';
 
       return {
         timestamp: Date.now(),
         mode,
         redis: {
-          connected: this.redisClient.isConnected(),
+          connected: true,
           state: this.redisClient.getState(),
         },
         agents: {
@@ -314,14 +307,19 @@ export class DashboardServer {
           total: Object.keys(prs).length,
           details: prs,
         },
-        messageBus: messageBusStats,
       };
     } catch (error) {
       console.error('[Dashboard] Error getting current state:', error);
       return {
         timestamp: Date.now(),
         mode: 'ERROR',
+        redis: {
+          connected: false,
+          state: 'error',
+        },
         error: error instanceof Error ? error.message : 'Unknown error',
+        agents: { active: 0, details: {} },
+        prs: { total: 0, details: {} },
       };
     }
   }
@@ -358,23 +356,6 @@ export class DashboardServer {
       switch (message.type) {
         case 'ping':
           this.sendToClient(client, { type: 'pong' });
-          break;
-
-        case 'subscribe':
-          // Add custom subscription handling if needed
-          client.subscriptions.add(message.channel);
-          this.sendToClient(client, {
-            type: 'subscribed',
-            channel: message.channel,
-          });
-          break;
-
-        case 'unsubscribe':
-          client.subscriptions.delete(message.channel);
-          this.sendToClient(client, {
-            type: 'unsubscribed',
-            channel: message.channel,
-          });
           break;
 
         case 'get-state':
@@ -431,7 +412,7 @@ export class DashboardServer {
   getStats() {
     return {
       clients: this.clients.size,
-      redis: this.redisClient.getState(),
+      redis: this.isRedisConnected ? 'connected' : 'disconnected',
       uptime: process.uptime(),
     };
   }
