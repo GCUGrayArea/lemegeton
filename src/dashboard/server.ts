@@ -5,14 +5,15 @@
  * and streaming state changes over WebSocket connections.
  */
 
-import express from 'express';
+import express, { Request, Response } from 'express';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { RedisClient } from '../redis/client';
+import { RedisHealthChecker } from '../redis/health';
 import { MessageBus } from '../communication/messageBus';
 import { CoordinationModeManager } from '../core/coordinationMode';
 import { getConfig } from '../config';
-import path from 'path';
+import * as path from 'path';
 
 export interface DashboardServerConfig {
   port?: number;
@@ -37,6 +38,7 @@ export class DashboardServer {
   private httpServer: ReturnType<typeof createServer>;
   private wss: WebSocketServer;
   private redisClient: RedisClient;
+  private healthChecker: RedisHealthChecker | null = null;
   private messageBus: MessageBus | null = null;
   private modeManager: CoordinationModeManager | null = null;
   private clients: Map<string, ClientState> = new Map();
@@ -44,10 +46,13 @@ export class DashboardServer {
   private updateInterval: NodeJS.Timeout | null = null;
 
   constructor(config: DashboardServerConfig = {}) {
+    // Resolve static path relative to project root
+    const defaultStaticPath = path.resolve(__dirname, '../../dashboard/dist');
+
     this.config = {
       port: config.port || 3000,
       host: config.host || 'localhost',
-      staticPath: config.staticPath || path.join(__dirname, '../../dashboard/dist'),
+      staticPath: config.staticPath || defaultStaticPath,
     };
 
     // Setup Express
@@ -72,7 +77,7 @@ export class DashboardServer {
     this.app.use(express.static(this.config.staticPath));
 
     // Health check
-    this.app.get('/api/health', (req, res) => {
+    this.app.get('/api/health', (req: Request, res: Response) => {
       res.json({
         status: 'ok',
         redis: this.redisClient.isConnected(),
@@ -82,7 +87,7 @@ export class DashboardServer {
     });
 
     // API endpoint for initial state
-    this.app.get('/api/state', async (req, res) => {
+    this.app.get('/api/state', async (req: Request, res: Response) => {
       try {
         const state = await this.getCurrentState();
         res.json(state);
@@ -92,7 +97,7 @@ export class DashboardServer {
     });
 
     // SPA fallback - serve index.html for all other routes
-    this.app.get('*', (req, res) => {
+    this.app.get('*', (req: Request, res: Response) => {
       res.sendFile(path.join(this.config.staticPath, 'index.html'));
     });
   }
@@ -114,13 +119,13 @@ export class DashboardServer {
       console.log(`[Dashboard] Client connected: ${clientId} (total: ${this.clients.size})`);
 
       // Send initial state
-      this.sendInitialState(client).catch((error) => {
+      this.sendInitialState(client).catch((error: Error) => {
         console.error('[Dashboard] Failed to send initial state:', error);
       });
 
       // Handle messages from client
       ws.on('message', (data: Buffer) => {
-        this.handleClientMessage(client, data).catch((error) => {
+        this.handleClientMessage(client, data).catch((error: Error) => {
           console.error('[Dashboard] Error handling client message:', error);
         });
       });
@@ -132,7 +137,7 @@ export class DashboardServer {
       });
 
       // Handle errors
-      ws.on('error', (error) => {
+      ws.on('error', (error: Error) => {
         console.error(`[Dashboard] Client error (${clientId}):`, error);
       });
     });
@@ -147,10 +152,14 @@ export class DashboardServer {
       await this.redisClient.connect();
       console.log('[Dashboard] Connected to Redis');
 
-      // Create mode manager (if not in isolated mode)
+      // Create health checker and mode manager
       try {
-        this.modeManager = new CoordinationModeManager(this.redisClient);
-        await this.modeManager.initialize();
+        this.healthChecker = new RedisHealthChecker(this.redisClient);
+        this.modeManager = new CoordinationModeManager(
+          this.redisClient,
+          this.healthChecker
+        );
+        await this.modeManager.start();
       } catch (error) {
         console.warn('[Dashboard] Running without coordination mode manager:', error);
       }
@@ -196,6 +205,11 @@ export class DashboardServer {
 
     // Close WebSocket server
     this.wss.close();
+
+    // Stop mode manager
+    if (this.modeManager) {
+      await this.modeManager.stop();
+    }
 
     // Stop message bus
     if (this.messageBus) {
@@ -258,7 +272,7 @@ export class DashboardServer {
   private startPeriodicUpdates(): void {
     // Send full state update every 5 seconds
     this.updateInterval = setInterval(() => {
-      this.broadcastStateUpdate().catch((error) => {
+      this.broadcastStateUpdate().catch((error: Error) => {
         console.error('[Dashboard] Failed to broadcast state update:', error);
       });
     }, 5000);

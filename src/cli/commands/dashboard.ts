@@ -7,6 +7,12 @@
 import { Command } from 'commander';
 import { DashboardServer } from '../../dashboard/server';
 
+interface DashboardOptions {
+  port?: number;
+  host?: string;
+  staticPath?: string;
+}
+
 /**
  * Create Dashboard command
  */
@@ -18,7 +24,7 @@ export function createDashboardCommand(): Command {
     .option('-p, --port <number>', 'HTTP server port (default: 3000)', parseInt)
     .option('-H, --host <host>', 'HTTP server host (default: localhost)')
     .option('--static-path <path>', 'Path to static files (default: dashboard/dist)')
-    .action(async (options) => {
+    .action(async (options: DashboardOptions) => {
       try {
         console.log('Starting Lemegeton Dashboard...');
 
