@@ -11,7 +11,6 @@ import { createHubCommands } from './commands/hub';
 import { createRunCommand } from './commands/run';
 import { createStatusCommand } from './commands/status';
 import { createPlanCommand } from './commands/plan';
-import { createTUICommand } from './commands/tui';
 import { createDashboardCommand } from './commands/dashboard';
 import { promptCommand } from './commands/prompt';
 import { formatCLIError, getExitCode } from './errors';
@@ -63,7 +62,6 @@ async function main() {
   program.addCommand(createRunCommand());
   program.addCommand(createStatusCommand());
   program.addCommand(createPlanCommand());
-  program.addCommand(createTUICommand());
   program.addCommand(createDashboardCommand());
   program.addCommand(createPromptCommands());
 
@@ -74,11 +72,6 @@ Examples:
   lemegeton hub start           Start the hub daemon
   lemegeton hub stop            Stop the hub daemon
   lemegeton hub status          Check hub status
-
-  # Terminal UI (Interactive Monitoring)
-  lemegeton tui                 Launch Terminal UI with progress tracking
-  lemegeton tui --debug         Launch TUI in debug mode
-  lemegeton tui --fps 20        Launch TUI with custom FPS
 
   # Web Dashboard
   lemegeton dashboard           Launch web-based dashboard
