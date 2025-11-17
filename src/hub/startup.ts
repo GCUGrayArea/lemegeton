@@ -108,8 +108,11 @@ export class StartupSequence {
   private parseTaskListContent(content: string): TaskList {
     const prs: TaskListPR[] = [];
 
+    // Normalize line endings to handle both Windows (CRLF) and Unix (LF)
+    const normalized = content.replace(/\r\n/g, '\n');
+
     // Split by the separator lines (---) to get YAML blocks
-    const blocks = content.split(/\n---\n/);
+    const blocks = normalized.split(/\n---\n/);
 
     for (const block of blocks) {
       const trimmed = block.trim();
