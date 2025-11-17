@@ -12,6 +12,7 @@ import { createRunCommand } from './commands/run';
 import { createStatusCommand } from './commands/status';
 import { createPlanCommand } from './commands/plan';
 import { createTUICommand } from './commands/tui';
+import { createDashboardCommand } from './commands/dashboard';
 import { promptCommand } from './commands/prompt';
 import { formatCLIError, getExitCode } from './errors';
 
@@ -63,6 +64,7 @@ async function main() {
   program.addCommand(createStatusCommand());
   program.addCommand(createPlanCommand());
   program.addCommand(createTUICommand());
+  program.addCommand(createDashboardCommand());
   program.addCommand(createPromptCommands());
 
   // Add examples to help
@@ -77,6 +79,10 @@ Examples:
   lemegeton tui                 Launch Terminal UI with progress tracking
   lemegeton tui --debug         Launch TUI in debug mode
   lemegeton tui --fps 20        Launch TUI with custom FPS
+
+  # Web Dashboard
+  lemegeton dashboard           Launch web-based dashboard
+  lemegeton dashboard -p 8080   Launch dashboard on custom port
 
   # Work Execution
   lemegeton run                 Run all available work

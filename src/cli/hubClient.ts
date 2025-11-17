@@ -146,7 +146,7 @@ export class HubClient {
    * Spawn daemon process
    */
   private async spawnDaemon(options: HubStartOptions): Promise<number> {
-    const scriptPath = path.join(__dirname, '..', 'hub', 'daemon.js');
+    const scriptPath = path.join(__dirname, '..', 'hub', 'daemonEntry.js');
     const logFile = path.join(this.workDir, '.lemegeton', 'hub.log');
 
     // Open log file
@@ -316,15 +316,62 @@ export class HubClient {
   async getTaskProgress(): Promise<TaskProgress> {
     await this.ensureRedisConnection();
 
-    // TODO: Query task progress from Redis
-    // For now, return stub data
-    return {
-      total: 0,
-      completed: 0,
-      inProgress: 0,
-      pending: 0,
-      failed: 0
-    };
+    try {
+      // Query PRs from Redis
+      const client = this.redis!.getClient();
+      const prsData = await client.get('state:prs');
+      if (!prsData) {
+        return {
+          total: 0,
+          completed: 0,
+          inProgress: 0,
+          pending: 0,
+          failed: 0
+        };
+      }
+
+      const prs = JSON.parse(prsData);
+      const prList = Object.values(prs) as any[];
+
+      // Count PRs by state
+      const progress = {
+        total: prList.length,
+        completed: 0,
+        inProgress: 0,
+        pending: 0,
+        failed: 0
+      };
+
+      for (const pr of prList) {
+        switch (pr.cold_state) {
+          case 'completed':
+            progress.completed++;
+            break;
+          case 'in_progress':
+            progress.inProgress++;
+            break;
+          case 'new':
+          case 'blocked':
+          case 'deferred':
+            progress.pending++;
+            break;
+          case 'failed':
+            progress.failed++;
+            break;
+        }
+      }
+
+      return progress;
+    } catch (error) {
+      // Return zeros if can't query Redis
+      return {
+        total: 0,
+        completed: 0,
+        inProgress: 0,
+        pending: 0,
+        failed: 0
+      };
+    }
   }
 
   /**
@@ -333,8 +380,18 @@ export class HubClient {
   async getCoordinationMode(): Promise<CoordinationMode> {
     await this.ensureRedisConnection();
 
-    // TODO: Query coordination mode from Redis
-    // For now, return default
+    try {
+      // Query coordination mode from Redis
+      const client = this.redis!.getClient();
+      const modeData = await client.get('coordination:mode');
+      if (modeData) {
+        return modeData as CoordinationMode;
+      }
+    } catch (error) {
+      // Fall through to default
+    }
+
+    // Default to distributed mode
     return CoordinationMode.DISTRIBUTED;
   }
 
