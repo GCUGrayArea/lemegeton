@@ -62,30 +62,46 @@ function App() {
     onMessage: handleMessage,
     onOpen: () => {
       console.log('[Dashboard] Connected to server');
+      // Only log connection if we don't have a recent disconnect message
       setActivityMessages((prev) => {
-        const newMessage: ActivityMessage = {
-          id: `${Date.now()}-${Math.random()}`,
-          timestamp: Date.now(),
-          type: 'success',
-          source: 'dashboard',
-          message: 'WebSocket connected to dashboard server',
-        };
-        const updated = [...prev, newMessage];
-        return updated.slice(-MAX_ACTIVITY_MESSAGES);
+        const lastMsg = prev[prev.length - 1];
+        const recentDisconnect = lastMsg &&
+          lastMsg.message.includes('disconnected') &&
+          Date.now() - lastMsg.timestamp < 5000;
+
+        if (!recentDisconnect) {
+          const newMessage: ActivityMessage = {
+            id: `${Date.now()}-${Math.random()}`,
+            timestamp: Date.now(),
+            type: 'success',
+            source: 'dashboard',
+            message: 'WebSocket connected to dashboard server',
+          };
+          return [...prev, newMessage].slice(-MAX_ACTIVITY_MESSAGES);
+        }
+        return prev;
       });
     },
     onClose: () => {
       console.log('[Dashboard] Disconnected from server');
+      // Throttle disconnect messages
       setActivityMessages((prev) => {
-        const newMessage: ActivityMessage = {
-          id: `${Date.now()}-${Math.random()}`,
-          timestamp: Date.now(),
-          type: 'warning',
-          source: 'dashboard',
-          message: 'WebSocket disconnected from server',
-        };
-        const updated = [...prev, newMessage];
-        return updated.slice(-MAX_ACTIVITY_MESSAGES);
+        const lastMsg = prev[prev.length - 1];
+        const recentDisconnect = lastMsg &&
+          lastMsg.message.includes('disconnected') &&
+          Date.now() - lastMsg.timestamp < 5000;
+
+        if (!recentDisconnect) {
+          const newMessage: ActivityMessage = {
+            id: `${Date.now()}-${Math.random()}`,
+            timestamp: Date.now(),
+            type: 'warning',
+            source: 'dashboard',
+            message: 'WebSocket disconnected from server',
+          };
+          return [...prev, newMessage].slice(-MAX_ACTIVITY_MESSAGES);
+        }
+        return prev;
       });
     },
   });

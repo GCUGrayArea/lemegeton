@@ -45,7 +45,7 @@ export class DashboardServer {
 
     this.config = {
       port: config.port || 3000,
-      host: config.host || 'localhost',
+      host: config.host || '0.0.0.0',  // Bind to all interfaces
       staticPath: config.staticPath || defaultStaticPath,
     };
 

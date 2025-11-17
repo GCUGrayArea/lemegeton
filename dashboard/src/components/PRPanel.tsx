@@ -16,31 +16,37 @@ export function PRPanel({ state }: PRPanelProps) {
     }));
   }, [state]);
 
-  const getStatusIcon = (status: string) => {
-    switch (status?.toLowerCase()) {
+  const getStatusIcon = (coldState: string) => {
+    switch (coldState?.toLowerCase()) {
       case 'completed':
         return '✓';
       case 'in_progress':
         return '▶';
       case 'blocked':
         return '●';
-      case 'pending':
+      case 'new':
+      case 'deferred':
         return '○';
+      case 'failed':
+        return '✗';
       default:
         return '?';
     }
   };
 
-  const getStatusClass = (status: string) => {
-    switch (status?.toLowerCase()) {
+  const getStatusClass = (coldState: string) => {
+    switch (coldState?.toLowerCase()) {
       case 'completed':
         return 'completed';
       case 'in_progress':
         return 'in-progress';
       case 'blocked':
         return 'blocked';
-      case 'pending':
+      case 'new':
+      case 'deferred':
         return 'pending';
+      case 'failed':
+        return 'failed';
       default:
         return 'unknown';
     }
@@ -56,28 +62,35 @@ export function PRPanel({ state }: PRPanelProps) {
           prs.map((pr) => (
             <div
               key={pr.id}
-              className={`pr-item ${getStatusClass(pr.status)} ${selectedPR === pr.id ? 'selected' : ''}`}
+              className={`pr-item ${getStatusClass(pr.cold_state)} ${selectedPR === pr.id ? 'selected' : ''}`}
               onClick={() => setSelectedPR(selectedPR === pr.id ? null : pr.id)}
             >
               <div className="pr-header">
-                <span className="pr-icon">{getStatusIcon(pr.status)}</span>
+                <span className="pr-icon">{getStatusIcon(pr.cold_state)}</span>
                 <span className="pr-id">{pr.id}</span>
                 <span className="pr-title">{pr.title || 'Untitled'}</span>
               </div>
               {selectedPR === pr.id && (
                 <div className="pr-details">
-                  {pr.description && <p className="pr-description">{pr.description}</p>}
-                  {pr.assignedTo && (
+                  <div className="pr-meta">
+                    <strong>Status:</strong> {pr.cold_state}
+                  </div>
+                  <div className="pr-meta">
+                    <strong>Priority:</strong> {pr.priority}
+                  </div>
+                  {pr.complexity && (
                     <div className="pr-meta">
-                      <strong>Assigned to:</strong> {pr.assignedTo}
+                      <strong>Complexity:</strong> {pr.complexity.score}/10 ({pr.complexity.suggested_model})
                     </div>
                   )}
-                  {pr.progress !== undefined && (
-                    <div className="pr-progress">
-                      <div className="progress-bar">
-                        <div className="progress-fill" style={{ width: `${pr.progress}%` }} />
-                      </div>
-                      <span className="progress-text">{pr.progress}%</span>
+                  {pr.dependencies && pr.dependencies.length > 0 && (
+                    <div className="pr-meta">
+                      <strong>Dependencies:</strong> {pr.dependencies.join(', ')}
+                    </div>
+                  )}
+                  {pr.estimated_files && (
+                    <div className="pr-meta">
+                      <strong>Files:</strong> {pr.estimated_files.length} estimated
                     </div>
                   )}
                 </div>
