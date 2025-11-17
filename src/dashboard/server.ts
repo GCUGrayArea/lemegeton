@@ -38,6 +38,7 @@ export class DashboardServer {
   private config: Required<DashboardServerConfig>;
   private updateInterval: NodeJS.Timeout | null = null;
   private isRedisConnected = false;
+  private cachedState: any = null;  // Cache state to avoid slow Redis queries on connect
 
   constructor(config: DashboardServerConfig = {}) {
     // Resolve static path relative to project root
@@ -204,6 +205,11 @@ export class DashboardServer {
 
         // Subscribe to Redis channels for live updates
         await this.subscribeToRedisChannels();
+
+        // Pre-populate state cache immediately
+        console.log('[Dashboard] Pre-populating state cache...');
+        this.cachedState = await this.getCurrentState();
+        console.log('[Dashboard] State cache populated');
       } catch (error) {
         console.warn('[Dashboard] Running without Redis connection:', error);
         console.warn('[Dashboard] Dashboard will work but without live data from hub');
@@ -400,27 +406,31 @@ export class DashboardServer {
    */
   private async sendInitialState(client: ClientState): Promise<void> {
     try {
-      // Check if client is still connected before fetching state
+      // Check if client is still connected
       if (client.ws.readyState !== WebSocket.OPEN) {
         console.warn(`[Dashboard] Client ${client.id} disconnected before initial state could be sent`);
         return;
       }
 
-      console.log(`[Dashboard] Fetching state for client ${client.id}...`);
-      const state = await this.getCurrentState();
+      // Use cached state if available, otherwise fetch from Redis
+      let state = this.cachedState;
+      if (!state) {
+        console.log(`[Dashboard] No cached state, fetching from Redis for client ${client.id}...`);
+        state = await this.getCurrentState();
+        this.cachedState = state; // Cache for next client
+      }
 
-      // Check again after async operation
+      // Check again after potential async operation
       if (client.ws.readyState !== WebSocket.OPEN) {
         console.warn(`[Dashboard] Client ${client.id} disconnected during state fetch`);
         return;
       }
 
-      console.log(`[Dashboard] Sending initial state to client ${client.id} (${Object.keys(state).length} keys)`);
+      console.log(`[Dashboard] Sending initial state to client ${client.id}`);
       this.sendToClient(client, {
         type: 'initial-state',
         data: state,
       });
-      console.log(`[Dashboard] Initial state sent to client ${client.id}`);
     } catch (error) {
       console.error(`[Dashboard] Error in sendInitialState for client ${client.id}:`, error);
       throw error;
@@ -432,6 +442,7 @@ export class DashboardServer {
    */
   private async broadcastStateUpdate(): Promise<void> {
     const state = await this.getCurrentState();
+    this.cachedState = state; // Update cache
     this.broadcastToClients({
       type: 'state-update',
       data: state,
