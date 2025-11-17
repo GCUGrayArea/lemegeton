@@ -97,6 +97,14 @@ export class DashboardServer {
    * Setup WebSocket handlers
    */
   private setupWebSocket(): void {
+    // Log WebSocket server creation
+    console.log('[Dashboard] WebSocket server created');
+
+    // Handle upgrade errors
+    this.httpServer.on('upgrade', (request, socket, head) => {
+      console.log('[Dashboard] WebSocket upgrade request received:', request.url);
+    });
+
     this.wss.on('connection', (ws: WebSocket) => {
       const clientId = this.generateClientId();
       const client: ClientState = {
@@ -131,6 +139,11 @@ export class DashboardServer {
       ws.on('error', (error: Error) => {
         console.error(`[Dashboard] Client error (${clientId}):`, error);
       });
+    });
+
+    // Log WebSocket server errors
+    this.wss.on('error', (error: Error) => {
+      console.error('[Dashboard] WebSocket server error:', error);
     });
   }
 
