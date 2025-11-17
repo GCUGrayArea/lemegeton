@@ -65,6 +65,52 @@ function App() {
     }
   }, []);
 
+  const handleOpen = useCallback(() => {
+    console.log('[Dashboard] Connected to server');
+    // Only log connection if we don't have a recent disconnect message
+    setActivityMessages((prev) => {
+      const lastMsg = prev[prev.length - 1];
+      const recentDisconnect = lastMsg &&
+        lastMsg.message.includes('disconnected') &&
+        Date.now() - lastMsg.timestamp < 5000;
+
+      if (!recentDisconnect) {
+        const newMessage: ActivityMessage = {
+          id: `${Date.now()}-${Math.random()}`,
+          timestamp: Date.now(),
+          type: 'success',
+          source: 'dashboard',
+          message: 'WebSocket connected to dashboard server',
+        };
+        return [...prev, newMessage].slice(-MAX_ACTIVITY_MESSAGES);
+      }
+      return prev;
+    });
+  }, []);
+
+  const handleClose = useCallback(() => {
+    console.log('[Dashboard] Disconnected from server');
+    // Throttle disconnect messages
+    setActivityMessages((prev) => {
+      const lastMsg = prev[prev.length - 1];
+      const recentDisconnect = lastMsg &&
+        lastMsg.message.includes('disconnected') &&
+        Date.now() - lastMsg.timestamp < 5000;
+
+      if (!recentDisconnect) {
+        const newMessage: ActivityMessage = {
+          id: `${Date.now()}-${Math.random()}`,
+          timestamp: Date.now(),
+          type: 'warning',
+          source: 'dashboard',
+          message: 'WebSocket disconnected from server',
+        };
+        return [...prev, newMessage].slice(-MAX_ACTIVITY_MESSAGES);
+      }
+      return prev;
+    });
+  }, []);
+
   // Construct WebSocket URL - same host and port as HTTP
   const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${wsProtocol}//${window.location.host}`;
@@ -74,50 +120,8 @@ function App() {
     reconnectInterval: 5000, // 5 seconds between reconnect attempts
     maxReconnectAttempts: 5,  // Only try 5 times before giving up
     onMessage: handleMessage,
-    onOpen: () => {
-      console.log('[Dashboard] Connected to server');
-      // Only log connection if we don't have a recent disconnect message
-      setActivityMessages((prev) => {
-        const lastMsg = prev[prev.length - 1];
-        const recentDisconnect = lastMsg &&
-          lastMsg.message.includes('disconnected') &&
-          Date.now() - lastMsg.timestamp < 5000;
-
-        if (!recentDisconnect) {
-          const newMessage: ActivityMessage = {
-            id: `${Date.now()}-${Math.random()}`,
-            timestamp: Date.now(),
-            type: 'success',
-            source: 'dashboard',
-            message: 'WebSocket connected to dashboard server',
-          };
-          return [...prev, newMessage].slice(-MAX_ACTIVITY_MESSAGES);
-        }
-        return prev;
-      });
-    },
-    onClose: () => {
-      console.log('[Dashboard] Disconnected from server');
-      // Throttle disconnect messages
-      setActivityMessages((prev) => {
-        const lastMsg = prev[prev.length - 1];
-        const recentDisconnect = lastMsg &&
-          lastMsg.message.includes('disconnected') &&
-          Date.now() - lastMsg.timestamp < 5000;
-
-        if (!recentDisconnect) {
-          const newMessage: ActivityMessage = {
-            id: `${Date.now()}-${Math.random()}`,
-            timestamp: Date.now(),
-            type: 'warning',
-            source: 'dashboard',
-            message: 'WebSocket disconnected from server',
-          };
-          return [...prev, newMessage].slice(-MAX_ACTIVITY_MESSAGES);
-        }
-        return prev;
-      });
-    },
+    onOpen: handleOpen,
+    onClose: handleClose,
   });
 
   return (
