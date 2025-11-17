@@ -326,6 +326,21 @@ export class DashboardServer {
       const prsData = await client.get('state:prs');
       const prs = prsData ? JSON.parse(prsData) : {};
 
+      // Reduce PR payload size - only send essential fields
+      const slimPrs: any = {};
+      for (const [id, pr] of Object.entries(prs) as [string, any][]) {
+        slimPrs[id] = {
+          id: pr.id,
+          title: pr.title,
+          cold_state: pr.cold_state,
+          priority: pr.priority,
+          complexity: pr.complexity,
+          dependencies: pr.dependencies,
+          // Exclude estimated_files and actual_files to reduce payload size
+          estimated_files: pr.estimated_files ? pr.estimated_files.length : 0,
+        };
+      }
+
       // Get coordination mode
       const modeData = await client.get('coordination:mode');
       const mode = modeData || 'UNKNOWN';
@@ -343,7 +358,7 @@ export class DashboardServer {
         },
         prs: {
           total: Object.keys(prs).length,
-          details: prs,
+          details: slimPrs,
         },
       };
     } catch (error) {

@@ -88,9 +88,9 @@ export function PRPanel({ state }: PRPanelProps) {
                       <strong>Dependencies:</strong> {pr.dependencies.join(', ')}
                     </div>
                   )}
-                  {pr.estimated_files && (
+                  {pr.estimated_files && pr.estimated_files > 0 && (
                     <div className="pr-meta">
-                      <strong>Files:</strong> {pr.estimated_files.length} estimated
+                      <strong>Files:</strong> {pr.estimated_files} estimated
                     </div>
                   )}
                 </div>
