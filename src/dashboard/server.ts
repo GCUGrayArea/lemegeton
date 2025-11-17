@@ -125,6 +125,22 @@ export class DashboardServer {
       this.clients.set(clientId, client);
       console.log(`[Dashboard] Client connected: ${clientId} (total: ${this.clients.size})`);
 
+      // Setup ping/pong heartbeat to keep connection alive
+      let isAlive = true;
+      ws.on('pong', () => {
+        isAlive = true;
+      });
+
+      const pingInterval = setInterval(() => {
+        if (!isAlive) {
+          console.log(`[Dashboard] Client ${clientId} failed ping, terminating`);
+          ws.terminate();
+          return;
+        }
+        isAlive = false;
+        ws.ping();
+      }, 15000); // Ping every 15 seconds
+
       // Send initial state
       this.sendInitialState(client).catch((error: Error) => {
         console.error('[Dashboard] Failed to send initial state:', error);
@@ -140,6 +156,7 @@ export class DashboardServer {
 
       // Handle client disconnect
       ws.on('close', (code: number, reason: Buffer) => {
+        clearInterval(pingInterval);
         this.clients.delete(clientId);
         console.log(`[Dashboard] Client disconnected: ${clientId} (code: ${code}, reason: ${reason.toString()}) (total: ${this.clients.size})`);
       });
@@ -148,6 +165,7 @@ export class DashboardServer {
       ws.on('error', (error: Error) => {
         console.error(`[Dashboard] Client error (${clientId}):`, error);
         console.error('[Dashboard] Client error stack:', error.stack);
+        clearInterval(pingInterval);
         this.clients.delete(clientId);
       });
     });
@@ -284,12 +302,12 @@ export class DashboardServer {
    * Start periodic state updates
    */
   private startPeriodicUpdates(): void {
-    // Send full state update every 5 seconds
+    // Send full state update every 30 seconds (reduced frequency to avoid overwhelming connection)
     this.updateInterval = setInterval(() => {
       this.broadcastStateUpdate().catch((error: Error) => {
         console.error('[Dashboard] Failed to broadcast state update:', error);
       });
-    }, 5000);
+    }, 30000);
   }
 
   /**
@@ -382,8 +400,21 @@ export class DashboardServer {
    */
   private async sendInitialState(client: ClientState): Promise<void> {
     try {
+      // Check if client is still connected before fetching state
+      if (client.ws.readyState !== WebSocket.OPEN) {
+        console.warn(`[Dashboard] Client ${client.id} disconnected before initial state could be sent`);
+        return;
+      }
+
       console.log(`[Dashboard] Fetching state for client ${client.id}...`);
       const state = await this.getCurrentState();
+
+      // Check again after async operation
+      if (client.ws.readyState !== WebSocket.OPEN) {
+        console.warn(`[Dashboard] Client ${client.id} disconnected during state fetch`);
+        return;
+      }
+
       console.log(`[Dashboard] Sending initial state to client ${client.id} (${Object.keys(state).length} keys)`);
       this.sendToClient(client, {
         type: 'initial-state',
