@@ -120,9 +120,15 @@ export function useWebSocket(options: UseWebSocketOptions): UseWebSocketReturn {
         try {
           const message = JSON.parse(event.data) as WebSocketMessage;
           setLastMessage(message);
-          onMessage?.(message);
+          try {
+            onMessage?.(message);
+          } catch (handlerError) {
+            console.error('[WebSocket] Error in message handler:', handlerError);
+            console.error('[WebSocket] Message that caused error:', message);
+          }
         } catch (error) {
           console.error('[WebSocket] Failed to parse message:', error);
+          console.error('[WebSocket] Raw message data:', event.data?.substring?.(0, 200));
         }
       };
 

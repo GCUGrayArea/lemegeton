@@ -12,44 +12,56 @@ function App() {
   const [activityMessages, setActivityMessages] = useState<ActivityMessage[]>([]);
 
   const handleMessage = useCallback((message: any) => {
-    switch (message.type) {
-      case 'initial-state':
-      case 'state-update':
-        setState(message.data);
-        break;
+    try {
+      console.log('[Dashboard] Received message type:', message.type);
 
-      case 'hub-message':
-      case 'agent-update':
-      case 'tui-update':
-        // Add to activity log (limit to prevent flooding)
-        setActivityMessages((prev) => {
-          const newMessage: ActivityMessage = {
-            id: `${Date.now()}-${Math.random()}`,
-            timestamp: Date.now(),
-            type: message.type,
-            source: message.data?.from || message.channel || 'system',
-            message: JSON.stringify(message.data?.payload || message.data || message),
-          };
-          const updated = [...prev, newMessage];
-          // Keep only last MAX_ACTIVITY_MESSAGES
-          return updated.slice(-MAX_ACTIVITY_MESSAGES);
-        });
-        break;
+      switch (message.type) {
+        case 'initial-state':
+        case 'state-update':
+          console.log('[Dashboard] Setting state with data:', Object.keys(message.data || {}));
+          setState(message.data);
+          console.log('[Dashboard] State set successfully');
+          break;
 
-      case 'error':
-        console.error('[Dashboard] Server error:', message.error);
-        setActivityMessages((prev) => {
-          const newMessage: ActivityMessage = {
-            id: `${Date.now()}-${Math.random()}`,
-            timestamp: Date.now(),
-            type: 'error',
-            source: 'system',
-            message: message.error,
-          };
-          const updated = [...prev, newMessage];
-          return updated.slice(-MAX_ACTIVITY_MESSAGES);
-        });
-        break;
+        case 'hub-message':
+        case 'agent-update':
+        case 'tui-update':
+          // Add to activity log (limit to prevent flooding)
+          setActivityMessages((prev) => {
+            const newMessage: ActivityMessage = {
+              id: `${Date.now()}-${Math.random()}`,
+              timestamp: Date.now(),
+              type: message.type,
+              source: message.data?.from || message.channel || 'system',
+              message: JSON.stringify(message.data?.payload || message.data || message),
+            };
+            const updated = [...prev, newMessage];
+            // Keep only last MAX_ACTIVITY_MESSAGES
+            return updated.slice(-MAX_ACTIVITY_MESSAGES);
+          });
+          break;
+
+        case 'error':
+          console.error('[Dashboard] Server error:', message.error);
+          setActivityMessages((prev) => {
+            const newMessage: ActivityMessage = {
+              id: `${Date.now()}-${Math.random()}`,
+              timestamp: Date.now(),
+              type: 'error',
+              source: 'system',
+              message: message.error,
+            };
+            const updated = [...prev, newMessage];
+            return updated.slice(-MAX_ACTIVITY_MESSAGES);
+          });
+          break;
+
+        default:
+          console.warn('[Dashboard] Unknown message type:', message.type);
+      }
+    } catch (error) {
+      console.error('[Dashboard] Error handling message:', error);
+      console.error('[Dashboard] Problematic message:', message);
     }
   }, []);
 
