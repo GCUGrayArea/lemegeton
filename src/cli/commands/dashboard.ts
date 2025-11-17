@@ -40,7 +40,8 @@ export function createDashboardCommand(): Command {
 
         console.log('');
         console.log('Dashboard server is running!');
-        console.log(`  → Open http://localhost:${options.port || 3000} in your browser`);
+        console.log(`  → Open http://127.0.0.1:${options.port || 3000} in your browser`);
+        console.log(`  → Note: Use 127.0.0.1 (not localhost) for WebSocket compatibility`);
         console.log('');
         console.log('Press Ctrl+C to stop the server');
 
