@@ -114,8 +114,14 @@ export class StartupSequence {
     for (const block of blocks) {
       const trimmed = block.trim();
 
-      // Skip empty blocks or blocks that don't contain pr_id
-      if (!trimmed || !trimmed.includes('pr_id:')) {
+      // Skip empty blocks
+      if (!trimmed) {
+        continue;
+      }
+
+      // Only parse blocks that START with pr_id: (actual YAML blocks)
+      // This filters out markdown sections that might contain pr_id in text
+      if (!trimmed.startsWith('pr_id:')) {
         continue;
       }
 
