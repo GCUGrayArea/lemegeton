@@ -12,6 +12,7 @@
 
 import { EventEmitter } from 'events';
 import { RedisClient, RedisConnectionState } from '../redis/client';
+import { RedisAutoSpawner } from '../redis/autoSpawn';
 import { CoordinationModeManager, CoordinationMode } from '../core/coordinationMode';
 import { StateMachine } from '../core/stateMachine';
 import { LeaseManager } from '../core/leaseManager';
@@ -88,6 +89,7 @@ export interface HubEvents {
 export class Hub extends EventEmitter {
   private config: Required<HubConfig>;
   private redisClient: RedisClient | null = null;
+  private redisAutoSpawner: RedisAutoSpawner | null = null;
   private healthChecker: RedisHealthChecker | null = null;
   private coordinationMode: CoordinationModeManager | null = null;
   private stateMachine: StateMachine | null = null;
@@ -232,9 +234,23 @@ export class Hub extends EventEmitter {
       appConfig.redis?.url || this.config.redis.url
     );
 
-    // Connect if not already connected
-    if (this.redisClient.getState() !== RedisConnectionState.CONNECTED) {
-      await this.redisClient.connect();
+    // If autoSpawn is enabled, try to spawn Redis Docker container if needed
+    if (this.config.redis.autoSpawn) {
+      this.redisAutoSpawner = new RedisAutoSpawner(this.redisClient);
+
+      try {
+        console.log('[Hub] Attempting to connect to Redis (with auto-spawn if needed)...');
+        await this.redisAutoSpawner.connectWithFallback(this.redisClient);
+        console.log('[Hub] Redis connection established');
+      } catch (error) {
+        console.error('[Hub] Failed to connect to Redis even with auto-spawn:', error);
+        throw error;
+      }
+    } else {
+      // Connect normally without auto-spawn
+      if (this.redisClient.getState() !== RedisConnectionState.CONNECTED) {
+        await this.redisClient.connect();
+      }
     }
   }
 
@@ -383,6 +399,11 @@ export class Hub extends EventEmitter {
       // Disconnect Redis
       if (this.redisClient) {
         await this.redisClient.disconnect();
+      }
+
+      // Clean up auto-spawned Redis container
+      if (this.redisAutoSpawner) {
+        await this.redisAutoSpawner.cleanup();
       }
     } catch (error) {
       console.error('[Hub] Cleanup error:', error);
