@@ -120,6 +120,7 @@ export class DashboardServer {
       // Send initial state
       this.sendInitialState(client).catch((error: Error) => {
         console.error('[Dashboard] Failed to send initial state:', error);
+        console.error('[Dashboard] Error stack:', error.stack);
       });
 
       // Handle messages from client
@@ -130,14 +131,15 @@ export class DashboardServer {
       });
 
       // Handle client disconnect
-      ws.on('close', () => {
+      ws.on('close', (code: number, reason: Buffer) => {
         this.clients.delete(clientId);
-        console.log(`[Dashboard] Client disconnected: ${clientId} (total: ${this.clients.size})`);
+        console.log(`[Dashboard] Client disconnected: ${clientId} (code: ${code}, reason: ${reason.toString()}) (total: ${this.clients.size})`);
       });
 
       // Handle errors
       ws.on('error', (error: Error) => {
         console.error(`[Dashboard] Client error (${clientId}):`, error);
+        console.error('[Dashboard] Client error stack:', error.stack);
       });
     });
 
@@ -341,11 +343,19 @@ export class DashboardServer {
    * Send initial state to newly connected client
    */
   private async sendInitialState(client: ClientState): Promise<void> {
-    const state = await this.getCurrentState();
-    this.sendToClient(client, {
-      type: 'initial-state',
-      data: state,
-    });
+    try {
+      console.log(`[Dashboard] Fetching state for client ${client.id}...`);
+      const state = await this.getCurrentState();
+      console.log(`[Dashboard] Sending initial state to client ${client.id} (${Object.keys(state).length} keys)`);
+      this.sendToClient(client, {
+        type: 'initial-state',
+        data: state,
+      });
+      console.log(`[Dashboard] Initial state sent to client ${client.id}`);
+    } catch (error) {
+      console.error(`[Dashboard] Error in sendInitialState for client ${client.id}:`, error);
+      throw error;
+    }
   }
 
   /**
@@ -395,8 +405,21 @@ export class DashboardServer {
    * Send message to specific client
    */
   private sendToClient(client: ClientState, message: any): void {
-    if (client.ws.readyState === WebSocket.OPEN) {
-      client.ws.send(JSON.stringify(message));
+    try {
+      if (client.ws.readyState === WebSocket.OPEN) {
+        const payload = JSON.stringify(message);
+        client.ws.send(payload);
+      } else {
+        console.warn(`[Dashboard] Cannot send to client ${client.id}: WebSocket not OPEN (state: ${client.ws.readyState})`);
+      }
+    } catch (error) {
+      console.error(`[Dashboard] Error sending message to client ${client.id}:`, error);
+      // Try to close the connection gracefully if send fails
+      try {
+        client.ws.close(1011, 'Send failed');
+      } catch (closeError) {
+        console.error(`[Dashboard] Error closing client ${client.id}:`, closeError);
+      }
     }
   }
 
