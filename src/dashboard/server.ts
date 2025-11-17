@@ -107,6 +107,14 @@ export class DashboardServer {
 
     this.wss.on('connection', (ws: WebSocket) => {
       const clientId = this.generateClientId();
+
+      // Limit max clients to prevent resource exhaustion
+      if (this.clients.size >= 10) {
+        console.warn(`[Dashboard] Max clients (10) reached, rejecting new connection`);
+        ws.close(1008, 'Server at capacity');
+        return;
+      }
+
       const client: ClientState = {
         id: clientId,
         ws,
@@ -136,10 +144,11 @@ export class DashboardServer {
         console.log(`[Dashboard] Client disconnected: ${clientId} (code: ${code}, reason: ${reason.toString()}) (total: ${this.clients.size})`);
       });
 
-      // Handle errors
+      // Handle errors - cleanup on error
       ws.on('error', (error: Error) => {
         console.error(`[Dashboard] Client error (${clientId}):`, error);
         console.error('[Dashboard] Client error stack:', error.stack);
+        this.clients.delete(clientId);
       });
     });
 
@@ -147,6 +156,20 @@ export class DashboardServer {
     this.wss.on('error', (error: Error) => {
       console.error('[Dashboard] WebSocket server error:', error);
     });
+
+    // Periodic cleanup of dead connections every 10 seconds
+    setInterval(() => {
+      let cleaned = 0;
+      this.clients.forEach((client, id) => {
+        if (client.ws.readyState === WebSocket.CLOSED || client.ws.readyState === WebSocket.CLOSING) {
+          this.clients.delete(id);
+          cleaned++;
+        }
+      });
+      if (cleaned > 0) {
+        console.log(`[Dashboard] Cleaned up ${cleaned} dead connections (total now: ${this.clients.size})`);
+      }
+    }, 10000);
   }
 
   /**

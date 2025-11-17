@@ -71,6 +71,8 @@ function App() {
 
   const { state: wsState, reconnect } = useWebSocket({
     url: wsUrl,
+    reconnectInterval: 5000, // 5 seconds between reconnect attempts
+    maxReconnectAttempts: 5,  // Only try 5 times before giving up
     onMessage: handleMessage,
     onOpen: () => {
       console.log('[Dashboard] Connected to server');
