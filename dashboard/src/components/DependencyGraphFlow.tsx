@@ -235,6 +235,7 @@ export function DependencyGraphFlow({
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           fitView
+          fitViewOptions={{ padding: 0.2, duration: 200 }}
           attributionPosition="bottom-left"
           minZoom={0.1}
           maxZoom={2}

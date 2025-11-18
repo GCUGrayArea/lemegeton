@@ -90,15 +90,18 @@ code {
 }
 
 .bottom-panel {
-  flex: 1;
-  min-height: 400px;
+  flex: 0 0 auto;
+  max-height: 400px;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
 }
 
 .progress-section {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  flex: 1;
+  flex: 1 1 auto;
   min-height: 0;
 }
 
@@ -110,6 +113,8 @@ code {
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
 }
 
 .panel h2 {
