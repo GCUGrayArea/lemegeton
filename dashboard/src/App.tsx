@@ -5,7 +5,7 @@ import { PRPanel } from './components/PRPanel';
 import { ActivityPanel, ActivityMessage } from './components/ActivityPanel';
 import { MetricsPanel } from './components/MetricsPanel';
 import { ProgressPanel } from './components/ProgressPanel';
-import { DependencyGraph } from './components/DependencyGraph';
+import { DependencyGraphFlow } from './components/DependencyGraphFlow';
 import { useProgressMetrics } from './hooks/useProgressMetrics';
 import './App.css';
 
@@ -189,7 +189,7 @@ function App() {
         <div className="progress-section">
           <MetricsPanel metrics={metrics} />
           <ProgressPanel phaseProgress={metrics.phaseProgress} />
-          <DependencyGraph
+          <DependencyGraphFlow
             prs={prsArray || []}
             dependencyGraph={metrics.dependencyGraph}
             criticalPath={metrics.criticalPath}

@@ -1,0 +1,266 @@
+.dependency-graph-flow {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.dependency-graph-flow h2 {
+  margin: 0 0 15px 0;
+  font-size: 1.2em;
+  color: #fff;
+  border-bottom: 1px solid #444;
+  padding-bottom: 10px;
+}
+
+.flow-container {
+  height: 600px;
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+/* React Flow custom styles */
+.react-flow {
+  background: #1a1a1a;
+}
+
+.react-flow__node {
+  cursor: pointer;
+}
+
+.react-flow__node:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+  transform: scale(1.02);
+}
+
+.react-flow__edge-path {
+  stroke-width: 2;
+}
+
+.react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 5;
+  animation: dashdraw 0.5s linear infinite;
+}
+
+@keyframes dashdraw {
+  to {
+    stroke-dashoffset: -10;
+  }
+}
+
+/* Node content */
+.node-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.node-id {
+  font-weight: bold;
+  font-size: 11px;
+  color: #58a6ff;
+}
+
+.node-title {
+  font-size: 10px;
+  color: #e6edf3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 160px;
+}
+
+.node-meta {
+  display: flex;
+  gap: 8px;
+  font-size: 9px;
+  margin-top: 2px;
+}
+
+.node-deps {
+  color: #f44336;
+  padding: 2px 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+}
+
+.node-dependents {
+  color: #4caf50;
+  padding: 2px 4px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+}
+
+/* Controls panel */
+.flow-controls {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.filter-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.filter-buttons button,
+.layout-toggle {
+  padding: 6px 12px;
+  border: 1px solid #444;
+  background: #1a1a1a;
+  color: #999;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.filter-buttons button:hover,
+.layout-toggle:hover {
+  background: #333;
+  color: #fff;
+  border-color: #666;
+}
+
+.filter-buttons button.active {
+  background: #2196f3;
+  color: #fff;
+  border-color: #2196f3;
+}
+
+.layout-toggle {
+  width: 100%;
+}
+
+/* Legend panel */
+.flow-legend {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 12px;
+}
+
+.legend-title {
+  font-weight: bold;
+  font-size: 0.9em;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.legend-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8em;
+  color: #ccc;
+}
+
+.legend-box {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: 2px solid;
+}
+
+.legend-box.completed {
+  background: #1b5e20;
+  border-color: #4caf50;
+}
+
+.legend-box.in-progress {
+  background: #0d47a1;
+  border-color: #2196f3;
+}
+
+.legend-box.broken {
+  background: #b71c1c;
+  border-color: #f44336;
+}
+
+.legend-box.critical {
+  background: #2a2a2a;
+  border-color: #ff9800;
+  border-width: 3px;
+}
+
+/* React Flow controls styling */
+.react-flow__controls {
+  background: #2a2a2a;
+  border: 1px solid #444;
+}
+
+.react-flow__controls-button {
+  background: #1a1a1a;
+  border-bottom: 1px solid #444;
+  color: #999;
+}
+
+.react-flow__controls-button:hover {
+  background: #333;
+  color: #fff;
+}
+
+.react-flow__controls-button svg {
+  fill: currentColor;
+}
+
+/* MiniMap styling */
+.react-flow__minimap {
+  background: #2a2a2a;
+  border: 1px solid #444;
+}
+
+.react-flow__minimap-mask {
+  fill: rgba(0, 0, 0, 0.6);
+}
+
+/* Attribution */
+.react-flow__attribution {
+  background: rgba(42, 42, 42, 0.8);
+  color: #666;
+  padding: 2px 6px;
+  font-size: 9px;
+}
+
+/* Empty state */
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+  font-style: italic;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .flow-container {
+    height: 400px;
+  }
+
+  .flow-controls,
+  .flow-legend {
+    font-size: 0.85em;
+  }
+
+  .filter-buttons {
+    flex-direction: column;
+  }
+
+  .filter-buttons button {
+    width: 100%;
+  }
+}
