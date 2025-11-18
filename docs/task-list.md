@@ -1040,14 +1040,14 @@ The TUI was replaced by a web-based dashboard due to Windows/MINGW compatibility
 - CLI command removed in favor of `lemegeton dashboard`
 
 **Migration Note:**
-Key TUI features not yet ported to dashboard: dependency graph visualization, progress bars by phase, completion time estimates, blocking/ready PR analysis. See PR-016 for dashboard feature parity plan.
+Dashboard feature parity achieved in PR-016. All key TUI features have been ported: dependency graph visualization (tree view), progress bars by phase, completion time estimates, blocking/ready PR analysis, critical path highlighting, and circular dependency detection.
 
 ### PR-016: Dashboard Progress Tracking and Visualization
 
 ---
 pr_id: PR-016
 title: Dashboard Progress Tracking and Visualization
-cold_state: new
+cold_state: completed
 priority: medium
 complexity:
   score: 6
@@ -1055,48 +1055,90 @@ complexity:
   suggested_model: sonnet
   rationale: Port TUI visualization features to React dashboard with modern web libraries
 dependencies: [PR-015]
-estimated_files:
+actual_files:
   - path: dashboard/src/components/ProgressPanel.tsx
     action: create
-    description: React component for phase-based progress bars
+    description: React component for phase-based progress bars (74 lines)
+  - path: dashboard/src/components/ProgressPanel.css
+    action: create
+    description: Styling for progress bars with status badges (187 lines)
   - path: dashboard/src/components/DependencyGraph.tsx
     action: create
-    description: Interactive dependency graph using React Flow or Cytoscape
+    description: Tree view dependency graph with critical path highlighting (196 lines)
+  - path: dashboard/src/components/DependencyGraph.css
+    action: create
+    description: Styling for dependency tree visualization (279 lines)
   - path: dashboard/src/components/MetricsPanel.tsx
     action: create
-    description: Completion estimates, velocity tracking, PR metrics
+    description: Completion estimates, velocity tracking, alerts (136 lines)
+  - path: dashboard/src/components/MetricsPanel.css
+    action: create
+    description: Metrics panel styling with responsive grid (154 lines)
   - path: dashboard/src/hooks/useProgressMetrics.ts
     action: create
-    description: Hook for calculating progress and completion estimates
+    description: Hook for calculating all progress metrics (184 lines)
   - path: dashboard/src/utils/dependencyAnalysis.ts
     action: create
-    description: Dependency graph analysis (port from TUI)
-  - path: tests/dashboard/progress.test.tsx
-    action: create
-    description: Tests for progress tracking components
+    description: Dependency graph analysis ported from TUI (482 lines)
+  - path: dashboard/src/App.tsx
+    action: modify
+    description: Integrated new components into dashboard layout
+  - path: dashboard/src/App.css
+    action: modify
+    description: Added progress-section styling
 ---
 
 **Description:**
 Port sophisticated progress tracking and dependency visualization from TUI to web dashboard. The TUI implementation (src/tui/progress.ts, dependencies.ts, metrics.ts - ~1,560 lines) provides reference implementation for features like phase-based progress bars, dependency tree visualization with cycle detection, completion time estimates, and critical path analysis.
 
 **Acceptance Criteria:**
-- [ ] Shows completed/in-progress/blocked PRs grouped by phase
-- [ ] Interactive dependency graph with cycle detection
-- [ ] Completion percentage displayed by phase and overall
-- [ ] Time estimates and velocity tracking shown
-- [ ] Updates in real-time via WebSocket
-- [ ] Export progress data (CSV/JSON) for external analysis
-- [ ] Visual indicators for critical path and blocking PRs
+- [x] Shows completed/in-progress/blocked PRs grouped by phase
+- [x] Interactive dependency graph with cycle detection
+- [x] Completion percentage displayed by phase and overall
+- [x] Time estimates and velocity tracking shown
+- [x] Updates in real-time via WebSocket
+- [ ] Export progress data (CSV/JSON) for external analysis (deferred)
+- [x] Visual indicators for critical path and blocking PRs
 
-**Implementation Approach:**
-1. Use React Flow or Cytoscape.js for interactive dependency graph
-2. Port metrics calculation logic from TUI's MetricsCalculator
-3. Integrate with existing WebSocket infrastructure in dashboard
-4. Add filtering/search controls to progress panel
-5. Create shareable progress URLs for team visibility
+**Implementation Details:**
+Implemented in single session with 1,721 lines of new code across 10 files:
+
+**Components Created:**
+- **MetricsPanel** (136 lines + 154 CSS): Displays 8 key metrics (completion %, in-progress, ready, blocked, estimated completion, critical path, parallelization, broken). Includes alerts for circular dependencies and high blocking rates.
+- **ProgressPanel** (74 lines + 187 CSS): Phase-based progress bars showing completion status for each project phase with status badges (Complete, Active, Blocked, Not Started).
+- **DependencyGraph** (196 lines + 279 CSS): Tree view of PR dependencies with expand/collapse, filtering (All PRs, Root PRs, Critical Path), and critical path highlighting.
+
+**Utilities & Hooks:**
+- **dependencyAnalysis.ts** (482 lines): Ported TUI's DependencyGraph class with all algorithms:
+  - Graph construction (adjacency lists)
+  - Cycle detection (DFS-based)
+  - Critical path calculation (longest dependency chain)
+  - Blocker identification
+  - Ready PR calculation
+  - Completion estimates with parallelization factor
+  - Phase progress calculation
+
+- **useProgressMetrics** (184 lines): React hook that calculates all metrics from PR data using the DependencyGraph class. Provides 17 different metrics including counts, percentages, time estimates, and dependency information.
+
+**Features Implemented:**
+✓ Real-time updates via WebSocket (uses existing infrastructure)
+✓ Responsive design matching dashboard theme
+✓ Circular dependency detection with visual alerts
+✓ High blocking rate warnings (>30%)
+✓ Critical path visualization
+✓ Expand/collapse dependency trees
+✓ Filter by All/Roots/Critical Path
+✓ Color-coded status indicators
+✓ Completion time estimates
+✓ Parallelization factor calculation
+
+**Deferred Features:**
+- Export to CSV/JSON (can be added later if needed)
+- React Flow interactive graph (tree view sufficient for now)
+- Tests (dashboard currently has no test infrastructure)
 
 **Notes:**
-This PR restores feature parity with the TUI for progress tracking. The TUI code serves as detailed specification - the algorithms and visualizations are proven, just need React/web adaptation. Priority increased to medium-high since this is a key visibility feature users relied on.
+Successfully restored TUI feature parity for progress tracking. The dashboard now provides sophisticated visibility into project progress, dependencies, and completion estimates. Implementation used simpler tree view instead of React Flow to avoid additional dependencies - works well and can be upgraded later if interactive graph is desired.
 
 ---
 
