@@ -128,10 +128,32 @@ function App() {
     onClose: handleClose,
   });
 
+  // Transform state data for progress metrics
+  // Server sends: { prs: { total: N, details: { 'PR-001': {...}, ... } } }
+  // Components need: prs array and states map
+  const prsArray = state?.prs?.details
+    ? Object.values(state.prs.details).map((pr: any) => ({
+        pr_id: pr.id,
+        title: pr.title,
+        cold_state: pr.cold_state,
+        dependencies: pr.dependencies || [],
+        complexity: pr.complexity || { score: 5, estimated_minutes: 60, suggested_model: 'sonnet' },
+      }))
+    : null;
+
+  const prStates = state?.prs?.details
+    ? Object.fromEntries(
+        Object.entries(state.prs.details).map(([id, pr]: [string, any]) => [
+          id,
+          { coldState: pr.cold_state, hotState: pr.hot_state },
+        ])
+      )
+    : null;
+
   // Calculate progress metrics from state
   const metrics = useProgressMetrics({
-    prs: state?.prs || null,
-    states: state?.prStates || null,
+    prs: prsArray,
+    states: prStates,
     velocityPRsPerDay: 2, // Default velocity
   });
 
@@ -168,7 +190,7 @@ function App() {
           <MetricsPanel metrics={metrics} />
           <ProgressPanel phaseProgress={metrics.phaseProgress} />
           <DependencyGraph
-            prs={state?.prs || []}
+            prs={prsArray || []}
             dependencyGraph={metrics.dependencyGraph}
             criticalPath={metrics.criticalPath}
           />
