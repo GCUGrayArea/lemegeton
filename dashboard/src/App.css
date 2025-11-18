@@ -427,3 +427,28 @@ code {
     gap: 0.5rem;
   }
 }
+
+/* Collapsible Headers */
+.collapsible-header {
+  cursor: pointer;
+  user-select: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: color 0.2s;
+}
+
+.collapsible-header:hover {
+  color: #58a6ff;
+}
+
+.chevron {
+  font-size: 0.8rem;
+  display: inline-block;
+  transition: transform 0.2s ease;
+  transform-origin: center;
+}
+
+.chevron.collapsed {
+  transform: rotate(-90deg);
+}

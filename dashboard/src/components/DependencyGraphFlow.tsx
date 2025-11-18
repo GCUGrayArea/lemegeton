@@ -71,6 +71,7 @@ export function DependencyGraphFlow({
   dependencyGraph,
   criticalPath,
 }: DependencyGraphFlowProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   const [layoutDirection, setLayoutDirection] = useState<'TB' | 'LR'>('TB');
   const [filter, setFilter] = useState<'all' | 'critical' | 'roots'>('all');
 
@@ -208,17 +209,26 @@ export function DependencyGraphFlow({
   if (!dependencyGraph || prs.length === 0) {
     return (
       <div className="dependency-graph-flow">
-        <h2>Dependency Graph</h2>
-        <div className="empty-state">No dependency data available</div>
+        <h2 onClick={() => setIsCollapsed(!isCollapsed)} className="collapsible-header">
+          <span className={`chevron ${isCollapsed ? 'collapsed' : ''}`}>▼</span>
+          Dependency Graph
+        </h2>
+        {!isCollapsed && (
+          <div className="empty-state">No dependency data available</div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="dependency-graph-flow">
-      <h2>Dependency Graph</h2>
+      <h2 onClick={() => setIsCollapsed(!isCollapsed)} className="collapsible-header">
+        <span className={`chevron ${isCollapsed ? 'collapsed' : ''}`}>▼</span>
+        Dependency Graph
+      </h2>
 
-      <div className="flow-container">
+      {!isCollapsed && (
+        <div className="flow-container">
         <ReactFlow
           nodes={nodes}
           edges={edges}
@@ -288,7 +298,8 @@ export function DependencyGraphFlow({
             </div>
           </Panel>
         </ReactFlow>
-      </div>
+        </div>
+      )}
     </div>
   );
 }

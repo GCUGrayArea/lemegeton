@@ -4,6 +4,7 @@
  * Displays phase-based progress bars showing completion status for each project phase.
  */
 
+import { useState } from 'react';
 import { PhaseProgress } from '../utils/dependencyAnalysis';
 import './ProgressPanel.css';
 
@@ -12,11 +13,17 @@ interface ProgressPanelProps {
 }
 
 export function ProgressPanel({ phaseProgress }: ProgressPanelProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   return (
     <div className="progress-panel">
-      <h2>Phase Progress</h2>
+      <h2 onClick={() => setIsCollapsed(!isCollapsed)} className="collapsible-header">
+        <span className={`chevron ${isCollapsed ? 'collapsed' : ''}`}>▼</span>
+        Phase Progress
+      </h2>
 
-      <div className="phase-list">
+      {!isCollapsed && (
+        <div className="phase-list">
         {phaseProgress.length === 0 ? (
           <div className="empty-state">
             No phase data available. Waiting for PR data...
@@ -68,7 +75,8 @@ export function ProgressPanel({ phaseProgress }: ProgressPanelProps) {
             </div>
           ))
         )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

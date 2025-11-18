@@ -5,6 +5,7 @@
  * time estimates, velocity, and complexity distribution.
  */
 
+import { useState } from 'react';
 import { ProgressMetrics } from '../hooks/useProgressMetrics';
 import './MetricsPanel.css';
 
@@ -13,6 +14,7 @@ interface MetricsPanelProps {
 }
 
 export function MetricsPanel({ metrics }: MetricsPanelProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
   // Format date
   const formatDate = (date: Date | null): string => {
     if (!date) return 'N/A';
@@ -38,9 +40,14 @@ export function MetricsPanel({ metrics }: MetricsPanelProps) {
 
   return (
     <div className="metrics-panel">
-      <h2>Project Metrics</h2>
+      <h2 onClick={() => setIsCollapsed(!isCollapsed)} className="collapsible-header">
+        <span className={`chevron ${isCollapsed ? 'collapsed' : ''}`}>▼</span>
+        Project Metrics
+      </h2>
 
-      <div className="metrics-grid">
+      {!isCollapsed && (
+        <>
+        <div className="metrics-grid">
         {/* Completion */}
         <div className="metric-card">
           <div className="metric-label">Completion</div>
@@ -130,6 +137,8 @@ export function MetricsPanel({ metrics }: MetricsPanelProps) {
             blocked. Consider parallelizing work or resolving blockers.
           </p>
         </div>
+      )}
+      </>
       )}
     </div>
   );
