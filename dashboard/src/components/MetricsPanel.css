@@ -1,0 +1,154 @@
+.metrics-panel {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.metrics-panel h2 {
+  margin: 0 0 20px 0;
+  font-size: 1.2em;
+  color: #fff;
+  border-bottom: 1px solid #444;
+  padding-bottom: 10px;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 15px;
+  margin-bottom: 20px;
+}
+
+.metric-card {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 15px;
+  text-align: center;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+.metric-card.ready {
+  border-left: 3px solid #4caf50;
+}
+
+.metric-card.blocked {
+  border-left: 3px solid #f44336;
+}
+
+.metric-card.estimate {
+  border-left: 3px solid #2196f3;
+}
+
+.metric-card.critical {
+  border-left: 3px solid #ff9800;
+}
+
+.metric-card.broken {
+  border-left: 3px solid #d32f2f;
+  background: #3a1f1f;
+}
+
+.metric-label {
+  font-size: 0.85em;
+  color: #999;
+  margin-bottom: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.metric-value {
+  font-size: 2.5em;
+  font-weight: bold;
+  color: #fff;
+  margin: 5px 0;
+  line-height: 1;
+}
+
+.metric-value-sm {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: #fff;
+  margin: 5px 0;
+}
+
+.metric-detail {
+  font-size: 0.8em;
+  color: #666;
+  margin-top: 8px;
+}
+
+/* Alerts */
+.metrics-alert {
+  padding: 15px;
+  border-radius: 6px;
+  margin-top: 15px;
+  border-left: 4px solid;
+}
+
+.metrics-alert.error {
+  background: #3a1f1f;
+  border-color: #f44336;
+  color: #ffcdd2;
+}
+
+.metrics-alert.warning {
+  background: #3a2f1f;
+  border-color: #ff9800;
+  color: #ffe0b2;
+}
+
+.metrics-alert strong {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 1.1em;
+}
+
+.metrics-alert p {
+  margin: 5px 0 0 0;
+  font-size: 0.9em;
+  line-height: 1.5;
+}
+
+.cycle-list {
+  margin-top: 10px;
+}
+
+.cycle-item {
+  font-family: 'Courier New', monospace;
+  font-size: 0.85em;
+  padding: 5px 10px;
+  margin: 5px 0;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .metrics-grid {
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  }
+
+  .metric-value {
+    font-size: 2em;
+  }
+}
+
+@media (max-width: 768px) {
+  .metrics-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .metric-value {
+    font-size: 1.8em;
+  }
+}

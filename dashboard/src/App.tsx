@@ -3,6 +3,10 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { StatusPanel } from './components/StatusPanel';
 import { PRPanel } from './components/PRPanel';
 import { ActivityPanel, ActivityMessage } from './components/ActivityPanel';
+import { MetricsPanel } from './components/MetricsPanel';
+import { ProgressPanel } from './components/ProgressPanel';
+import { DependencyGraph } from './components/DependencyGraph';
+import { useProgressMetrics } from './hooks/useProgressMetrics';
 import './App.css';
 
 const MAX_ACTIVITY_MESSAGES = 100;
@@ -124,6 +128,13 @@ function App() {
     onClose: handleClose,
   });
 
+  // Calculate progress metrics from state
+  const metrics = useProgressMetrics({
+    prs: state?.prs || null,
+    states: state?.prStates || null,
+    velocityPRsPerDay: 2, // Default velocity
+  });
+
   return (
     <div className="app">
       <header className="app-header">
@@ -151,6 +162,18 @@ function App() {
           <StatusPanel state={state} />
           <PRPanel state={state} />
         </div>
+
+        {/* Progress Tracking Panels */}
+        <div className="progress-section">
+          <MetricsPanel metrics={metrics} />
+          <ProgressPanel phaseProgress={metrics.phaseProgress} />
+          <DependencyGraph
+            prs={state?.prs || []}
+            dependencyGraph={metrics.dependencyGraph}
+            criticalPath={metrics.criticalPath}
+          />
+        </div>
+
         <div className="bottom-panel">
           <ActivityPanel messages={activityMessages} />
         </div>

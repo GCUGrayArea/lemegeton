@@ -94,6 +94,12 @@ code {
   min-height: 400px;
 }
 
+.progress-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
 /* Panels */
 .panel {
   background: #161b22;

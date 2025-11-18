@@ -1,0 +1,279 @@
+.dependency-graph {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.graph-header {
+  margin-bottom: 20px;
+}
+
+.graph-header h2 {
+  margin: 0 0 15px 0;
+  font-size: 1.2em;
+  color: #fff;
+  border-bottom: 1px solid #444;
+  padding-bottom: 10px;
+}
+
+.graph-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 15px;
+}
+
+.filter-buttons,
+.expand-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.filter-buttons button,
+.expand-buttons button {
+  padding: 6px 12px;
+  border: 1px solid #444;
+  background: #2a2a2a;
+  color: #999;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.85em;
+  transition: all 0.2s;
+}
+
+.filter-buttons button:hover,
+.expand-buttons button:hover {
+  background: #333;
+  color: #fff;
+  border-color: #666;
+}
+
+.filter-buttons button.active {
+  background: #2196f3;
+  color: #fff;
+  border-color: #2196f3;
+}
+
+.graph-content {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 15px;
+  max-height: 600px;
+  overflow-y: auto;
+  margin-bottom: 15px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+  font-style: italic;
+}
+
+.pr-tree {
+  font-family: 'Courier New', monospace;
+  font-size: 0.9em;
+}
+
+.pr-node-container {
+  margin: 2px 0;
+}
+
+.pr-node {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  transition: background 0.2s;
+  position: relative;
+}
+
+.pr-node:hover {
+  background: #333;
+}
+
+.pr-node.critical-path {
+  background: rgba(255, 152, 0, 0.15);
+  border-left: 3px solid #ff9800;
+}
+
+.pr-node.critical-path:hover {
+  background: rgba(255, 152, 0, 0.25);
+}
+
+.pr-node.cycle {
+  background: rgba(244, 67, 54, 0.15);
+  border-left: 3px solid #f44336;
+  color: #f44336;
+  font-style: italic;
+}
+
+.expand-btn {
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  font-size: 0.8em;
+  padding: 2px 5px;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: all 0.2s;
+}
+
+.expand-btn:hover {
+  background: #444;
+  color: #fff;
+}
+
+.pr-id {
+  font-weight: bold;
+  color: #2196f3;
+  min-width: 80px;
+}
+
+.pr-title {
+  flex: 1;
+  color: #ccc;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.critical-badge {
+  background: #ff9800;
+  color: #000;
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.75em;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.pr-meta {
+  display: flex;
+  gap: 10px;
+  font-size: 0.85em;
+}
+
+.dep-count,
+.dependent-count {
+  color: #666;
+  padding: 2px 6px;
+  border-radius: 3px;
+  background: #1a1a1a;
+}
+
+.dep-count {
+  color: #f44336;
+}
+
+.dependent-count {
+  color: #4caf50;
+}
+
+.pr-children {
+  border-left: 2px dotted #444;
+  margin-left: 30px;
+}
+
+.cycle-indicator {
+  color: #f44336;
+  font-style: italic;
+}
+
+.graph-legend {
+  display: flex;
+  gap: 20px;
+  padding: 15px;
+  background: #2a2a2a;
+  border-radius: 6px;
+  flex-wrap: wrap;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.legend-badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 0.75em;
+  font-weight: bold;
+}
+
+.legend-badge.critical-path {
+  background: #ff9800;
+  color: #000;
+}
+
+.legend-indicator {
+  font-family: 'Courier New', monospace;
+  color: #666;
+  padding: 2px 6px;
+  background: #1a1a1a;
+  border-radius: 3px;
+}
+
+.legend-text {
+  color: #999;
+  font-size: 0.85em;
+}
+
+/* Scrollbar styling */
+.graph-content::-webkit-scrollbar {
+  width: 10px;
+}
+
+.graph-content::-webkit-scrollbar-track {
+  background: #1a1a1a;
+  border-radius: 5px;
+}
+
+.graph-content::-webkit-scrollbar-thumb {
+  background: #444;
+  border-radius: 5px;
+}
+
+.graph-content::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .graph-controls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filter-buttons,
+  .expand-buttons {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .filter-buttons button,
+  .expand-buttons button {
+    flex: 1;
+    font-size: 0.8em;
+  }
+
+  .pr-title {
+    max-width: 150px;
+  }
+
+  .graph-legend {
+    flex-direction: column;
+  }
+}
