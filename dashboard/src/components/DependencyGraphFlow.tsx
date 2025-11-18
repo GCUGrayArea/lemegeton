@@ -232,7 +232,7 @@ export function DependencyGraphFlow({
           <Background color="#333" gap={16} />
           <Controls />
           <MiniMap
-            nodeColor={(node) => {
+            nodeColor={(node: Node) => {
               const style = node.style as any;
               return style?.background || '#2a2a2a';
             }}
