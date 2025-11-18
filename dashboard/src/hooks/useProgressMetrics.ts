@@ -14,7 +14,6 @@ import {
   DependencyGraph,
   PRData,
   PRState,
-  CompletionEstimate,
   calculatePhaseProgress,
   PhaseProgress,
 } from '../utils/dependencyAnalysis';
