@@ -4,6 +4,10 @@
   border-radius: 8px;
   padding: 20px;
   margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 400px;
 }
 
 .dependency-graph-flow h2 {
@@ -15,11 +19,12 @@
 }
 
 .flow-container {
-  height: 600px;
+  flex: 1;
   background: #1a1a1a;
   border: 1px solid #444;
   border-radius: 6px;
   overflow: hidden;
+  min-height: 400px;
 }
 
 /* React Flow custom styles */
@@ -248,7 +253,7 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .flow-container {
-    height: 400px;
+    min-height: 300px;
   }
 
   .flow-controls,
