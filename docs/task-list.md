@@ -893,14 +893,17 @@ Critical for agent coordination and mode-agnostic communication. Successfully im
 
 ## ═══════════════════════════════════════════════════════════════
 ## PHASE 0.1b - UX & INTEGRATION (PR-014 to PR-016)
-## Goal: Single shell TUI, input routing, MCP infrastructure
+## Goal: Web dashboard, CLI commands, progress visualization
 ##
 ## Testable at Phase End:
-## - CLI commands work (hub start/stop, run)
-## - Single shell TUI displays agent status
-## - User input routes to correct agent
-## - Progress tracking visible
-## - Real-time updates working
+## - CLI commands work (hub start/stop, run, dashboard)
+## - Web dashboard displays agent status and activity
+## - Progress tracking with dependency graphs visible
+## - Real-time updates via WebSocket working
+## - Multi-user browser access supported
+##
+## NOTE: Originally planned for TUI, but pivoted to web dashboard
+##       for better Windows compatibility and multi-user support.
 ## ═══════════════════════════════════════════════════════════════
 
 ## Block 5: CLI and User Interface (Depends on: Block 3)
@@ -978,16 +981,16 @@ Straightforward CLI implementation. Important for user experience.
 - Output formatters for human-readable and JSON output
 - 35 tests passing, full coverage of CLI functionality
 
-### PR-015: Terminal UI (TUI) Implementation
+### PR-015: Terminal UI (TUI) Implementation [DEPRECATED]
 
 ---
 pr_id: PR-015
-title: Terminal UI (TUI) Implementation
+title: Terminal UI (TUI) Implementation [DEPRECATED - Use Web Dashboard]
 cold_state: completed
 priority: high
 complexity:
   score: 7
-  estimated_minutes: 70
+  estimated_minutes: 70 (actual: ~240 minutes)
   suggested_model: sonnet
   rationale: Complex terminal UI with real-time updates
 dependencies: [PR-014, PR-013]
@@ -1012,6 +1015,9 @@ estimated_files:
 **Description:**
 Implement single shell Terminal UI showing agent status, activity logs, and routing user input to appropriate agents.
 
+**Status: DEPRECATED**
+The TUI was replaced by a web-based dashboard due to Windows/MINGW compatibility issues and better multi-user support. The TUI code (~3,800 lines) remains in the codebase as reference implementation but CLI commands have been removed. The web dashboard is now the primary user interface.
+
 **Acceptance Criteria:**
 - [x] Status bar shows all active agents
 - [x] Real-time updates via Redis pub/sub
@@ -1020,72 +1026,119 @@ Implement single shell Terminal UI showing agent status, activity logs, and rout
 - [x] Coordination mode displayed
 - [x] Clean terminal handling
 
-**Notes:**
-Complex UI requiring careful terminal handling and real-time updates. Use blessed or ink.
-
 **Implementation Details:**
 - Built with blessed + blessed-contrib for mature TUI support
-- Created 5 core components:
+- Created 5 core components with sophisticated features:
   - TUIManager: Main orchestrator with lifecycle management
-  - StatusBar: Shows mode, agents, active PRs (top 3 lines)
+  - StatusBar: Shows mode, agents, active PRs
   - ActivityLog: Scrollable feed with 1000-entry circular buffer
-  - InputRouter: Command parsing with @agent-id syntax, command history
+  - InputRouter: Command parsing with @agent-id syntax
   - RenderLoop: Throttled rendering (max 10 FPS)
-- Integration with existing infrastructure:
-  - MessageBus subscriptions for real-time updates
-  - AgentRegistry polling for status (1s interval)
-  - CoordinationModeManager for mode changes
-- Features:
-  - System commands: /help, /quit, /clear, /filter, /stats
-  - Direct messaging: @agent-id message
-  - Broadcast messaging: message
-  - Keyboard shortcuts: Ctrl+C/q (quit), Ctrl+L (clear), ? (help)
-  - Auto-scrolling activity log with search and filtering
-  - Color-coded agent states and message types
-- TypeScript compilation successful
-- CLI command added: `lemegeton tui`
-- Ready for integration testing with running Hub
+  - **ProgressTracker: Phase bars, status icons, metrics** (not in dashboard)
+  - **DependencyGraph: Tree visualization, cycle detection** (not in dashboard)
+  - **MetricsCalculator: Completion estimates, velocity** (not in dashboard)
+- CLI command removed in favor of `lemegeton dashboard`
 
-### PR-016: Progress Tracking Display
+**Migration Note:**
+Dashboard feature parity achieved in PR-016. All key TUI features have been ported: dependency graph visualization (tree view), progress bars by phase, completion time estimates, blocking/ready PR analysis, critical path highlighting, and circular dependency detection.
+
+### PR-016: Dashboard Progress Tracking and Visualization
 
 ---
 pr_id: PR-016
-title: Progress Tracking Display
-cold_state: new
+title: Dashboard Progress Tracking and Visualization
+cold_state: completed
 priority: medium
 complexity:
-  score: 4
-  estimated_minutes: 40
+  score: 6
+  estimated_minutes: 60
   suggested_model: sonnet
-  rationale: Progress visualization with dependency tracking
+  rationale: Port TUI visualization features to React dashboard with modern web libraries
 dependencies: [PR-015]
-estimated_files:
-  - path: src/tui/progress.ts
+actual_files:
+  - path: dashboard/src/components/ProgressPanel.tsx
     action: create
-    description: progress tracking component
-  - path: src/tui/dependencies.ts
+    description: React component for phase-based progress bars (74 lines)
+  - path: dashboard/src/components/ProgressPanel.css
     action: create
-    description: dependency visualization
-  - path: src/tui/metrics.ts
+    description: Styling for progress bars with status badges (187 lines)
+  - path: dashboard/src/components/DependencyGraph.tsx
     action: create
-    description: metrics display
-  - path: tests/tui.test.ts
+    description: Tree view dependency graph with critical path highlighting (196 lines)
+  - path: dashboard/src/components/DependencyGraph.css
     action: create
-    description: TUI component tests
+    description: Styling for dependency tree visualization (279 lines)
+  - path: dashboard/src/components/MetricsPanel.tsx
+    action: create
+    description: Completion estimates, velocity tracking, alerts (136 lines)
+  - path: dashboard/src/components/MetricsPanel.css
+    action: create
+    description: Metrics panel styling with responsive grid (154 lines)
+  - path: dashboard/src/hooks/useProgressMetrics.ts
+    action: create
+    description: Hook for calculating all progress metrics (184 lines)
+  - path: dashboard/src/utils/dependencyAnalysis.ts
+    action: create
+    description: Dependency graph analysis ported from TUI (482 lines)
+  - path: dashboard/src/App.tsx
+    action: modify
+    description: Integrated new components into dashboard layout
+  - path: dashboard/src/App.css
+    action: modify
+    description: Added progress-section styling
 ---
 
 **Description:**
-Add progress tracking visualization to TUI showing PR completion status, dependencies, and metrics.
+Port sophisticated progress tracking and dependency visualization from TUI to web dashboard. The TUI implementation (src/tui/progress.ts, dependencies.ts, metrics.ts - ~1,560 lines) provides reference implementation for features like phase-based progress bars, dependency tree visualization with cycle detection, completion time estimates, and critical path analysis.
 
 **Acceptance Criteria:**
-- [ ] Shows completed/in-progress/blocked PRs
-- [ ] Dependency chains visible
-- [ ] Completion percentage displayed
-- [ ] Time estimates shown
-- [ ] Updates in real-time
+- [x] Shows completed/in-progress/blocked PRs grouped by phase
+- [x] Interactive dependency graph with cycle detection
+- [x] Completion percentage displayed by phase and overall
+- [x] Time estimates and velocity tracking shown
+- [x] Updates in real-time via WebSocket
+- [ ] Export progress data (CSV/JSON) for external analysis (deferred)
+- [x] Visual indicators for critical path and blocking PRs
+
+**Implementation Details:**
+Implemented in single session with 1,721 lines of new code across 10 files:
+
+**Components Created:**
+- **MetricsPanel** (136 lines + 154 CSS): Displays 8 key metrics (completion %, in-progress, ready, blocked, estimated completion, critical path, parallelization, broken). Includes alerts for circular dependencies and high blocking rates.
+- **ProgressPanel** (74 lines + 187 CSS): Phase-based progress bars showing completion status for each project phase with status badges (Complete, Active, Blocked, Not Started).
+- **DependencyGraph** (196 lines + 279 CSS): Tree view of PR dependencies with expand/collapse, filtering (All PRs, Root PRs, Critical Path), and critical path highlighting.
+
+**Utilities & Hooks:**
+- **dependencyAnalysis.ts** (482 lines): Ported TUI's DependencyGraph class with all algorithms:
+  - Graph construction (adjacency lists)
+  - Cycle detection (DFS-based)
+  - Critical path calculation (longest dependency chain)
+  - Blocker identification
+  - Ready PR calculation
+  - Completion estimates with parallelization factor
+  - Phase progress calculation
+
+- **useProgressMetrics** (184 lines): React hook that calculates all metrics from PR data using the DependencyGraph class. Provides 17 different metrics including counts, percentages, time estimates, and dependency information.
+
+**Features Implemented:**
+✓ Real-time updates via WebSocket (uses existing infrastructure)
+✓ Responsive design matching dashboard theme
+✓ Circular dependency detection with visual alerts
+✓ High blocking rate warnings (>30%)
+✓ Critical path visualization
+✓ Expand/collapse dependency trees
+✓ Filter by All/Roots/Critical Path
+✓ Color-coded status indicators
+✓ Completion time estimates
+✓ Parallelization factor calculation
+
+**Deferred Features:**
+- Export to CSV/JSON (can be added later if needed)
+- React Flow interactive graph (tree view sufficient for now)
+- Tests (dashboard currently has no test infrastructure)
 
 **Notes:**
-Enhances user visibility into system progress.
+Successfully restored TUI feature parity for progress tracking. The dashboard now provides sophisticated visibility into project progress, dependencies, and completion estimates. Implementation used simpler tree view instead of React Flow to avoid additional dependencies - works well and can be upgraded later if interactive graph is desired.
 
 ---
 

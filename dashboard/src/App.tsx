@@ -3,6 +3,10 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { StatusPanel } from './components/StatusPanel';
 import { PRPanel } from './components/PRPanel';
 import { ActivityPanel, ActivityMessage } from './components/ActivityPanel';
+import { MetricsPanel } from './components/MetricsPanel';
+import { ProgressPanel } from './components/ProgressPanel';
+import { DependencyGraphFlow } from './components/DependencyGraphFlow';
+import { useProgressMetrics } from './hooks/useProgressMetrics';
 import './App.css';
 
 const MAX_ACTIVITY_MESSAGES = 100;
@@ -124,6 +128,43 @@ function App() {
     onClose: handleClose,
   });
 
+  // Transform state data for progress metrics
+  // Server sends: { prs: { total: N, details: { 'PR-001': {...}, ... } } }
+  // Components need: prs array and states map
+  const prsArray = state?.prs?.details
+    ? Object.values(state.prs.details).map((pr: any) => ({
+        pr_id: pr.id,
+        title: pr.title,
+        cold_state: pr.cold_state,
+        dependencies: pr.dependencies || [],
+        complexity: pr.complexity || { score: 5, estimated_minutes: 60, suggested_model: 'sonnet' },
+      }))
+    : null;
+
+  const prStates = state?.prs?.details
+    ? Object.fromEntries(
+        Object.entries(state.prs.details).map(([id, pr]: [string, any]) => [
+          id,
+          { coldState: pr.cold_state, hotState: pr.hot_state },
+        ])
+      )
+    : null;
+
+  // Calculate progress metrics from state
+  const metrics = useProgressMetrics({
+    prs: prsArray,
+    states: prStates,
+    velocityPRsPerDay: 2, // Default velocity
+  });
+
+  console.log('App - Metrics calculated:', {
+    hasPrsArray: !!prsArray,
+    prsArrayLength: prsArray?.length,
+    hasPrStates: !!prStates,
+    hasDepGraph: !!metrics.dependencyGraph,
+    criticalPathLength: metrics.criticalPath?.length
+  });
+
   return (
     <div className="app">
       <header className="app-header">
@@ -151,6 +192,18 @@ function App() {
           <StatusPanel state={state} />
           <PRPanel state={state} />
         </div>
+
+        {/* Progress Tracking Panels */}
+        <div className="progress-section">
+          <MetricsPanel metrics={metrics} />
+          <ProgressPanel phaseProgress={metrics.phaseProgress} />
+          <DependencyGraphFlow
+            prs={prsArray || []}
+            dependencyGraph={metrics.dependencyGraph}
+            criticalPath={metrics.criticalPath}
+          />
+        </div>
+
         <div className="bottom-panel">
           <ActivityPanel messages={activityMessages} />
         </div>

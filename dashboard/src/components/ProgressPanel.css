@@ -1,0 +1,187 @@
+.progress-panel {
+  background: #1e1e1e;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.progress-panel h2 {
+  margin: 0 0 20px 0;
+  font-size: 1.2em;
+  color: #fff;
+  border-bottom: 1px solid #444;
+  padding-bottom: 10px;
+}
+
+.phase-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 40px 20px;
+  color: #666;
+  font-style: italic;
+}
+
+.phase-item {
+  background: #2a2a2a;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 15px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.phase-item:hover {
+  transform: translateX(4px);
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.3);
+}
+
+.phase-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.phase-name {
+  font-size: 1.1em;
+  font-weight: bold;
+  color: #fff;
+  flex: 1;
+  min-width: 200px;
+}
+
+.phase-stats {
+  display: flex;
+  gap: 15px;
+  flex-wrap: wrap;
+}
+
+.phase-stats .stat {
+  font-size: 0.85em;
+  color: #999;
+  white-space: nowrap;
+}
+
+.phase-stats .stat.completed {
+  color: #4caf50;
+}
+
+.phase-stats .stat.in-progress {
+  color: #2196f3;
+}
+
+.phase-stats .stat.blocked {
+  color: #f44336;
+}
+
+.phase-stats .stat.total {
+  color: #999;
+  font-weight: bold;
+}
+
+.progress-bar-container {
+  position: relative;
+  margin: 10px 0;
+}
+
+.progress-bar-bg {
+  background: #1a1a1a;
+  border-radius: 10px;
+  height: 24px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-bar-fill {
+  background: linear-gradient(90deg, #4caf50 0%, #66bb6a 100%);
+  height: 100%;
+  transition: width 0.5s ease;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: 10px;
+  border-radius: 10px;
+}
+
+.progress-text {
+  font-size: 0.75em;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.progress-text-outside {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 0.75em;
+  font-weight: bold;
+  color: #999;
+}
+
+.phase-status-icons {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.75em;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.complete {
+  background: #1b5e20;
+  color: #a5d6a7;
+  border: 1px solid #4caf50;
+}
+
+.status-badge.active {
+  background: #0d47a1;
+  color: #90caf9;
+  border: 1px solid #2196f3;
+}
+
+.status-badge.blocked {
+  background: #b71c1c;
+  color: #ef9a9a;
+  border: 1px solid #f44336;
+}
+
+.status-badge.pending {
+  background: #424242;
+  color: #bdbdbd;
+  border: 1px solid #757575;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .phase-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .phase-stats {
+    font-size: 0.8em;
+  }
+
+  .phase-name {
+    font-size: 1em;
+  }
+}

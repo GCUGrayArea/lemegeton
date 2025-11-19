@@ -4,6 +4,10 @@
   "description": "Lemegeton - Agent Orchestration Framework for Coding Projects",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "private": true,
+  "workspaces": [
+    "dashboard"
+  ],
   "bin": {
     "lemegeton": "./bin/lemegeton"
   },
