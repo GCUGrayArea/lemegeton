@@ -1,12 +1,11 @@
 import { useState, useCallback } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
-import { StatusPanel } from './components/StatusPanel';
-import { PRPanel } from './components/PRPanel';
-import { ActivityPanel, ActivityMessage } from './components/ActivityPanel';
+import { ActivityMessage } from './components/ActivityPanel';
 import { MetricsPanel } from './components/MetricsPanel';
-import { ProgressPanel } from './components/ProgressPanel';
 import { DependencyGraphFlow } from './components/DependencyGraphFlow';
 import { useProgressMetrics } from './hooks/useProgressMetrics';
+import Drawer from './components/Drawer';
+import HeaderStatus from './components/HeaderStatus';
 import './App.css';
 
 const MAX_ACTIVITY_MESSAGES = 100;
@@ -161,43 +160,33 @@ function App() {
     <div className="app">
       <header className="app-header">
         <h1>Lemegeton Dashboard</h1>
-        <div className="connection-status">
-          {wsState.isConnected ? (
-            <span className="status-connected">WebSocket Connected</span>
-          ) : wsState.isReconnecting ? (
-            <span className="status-reconnecting">
-              Reconnecting... (attempt {wsState.reconnectAttempt})
-            </span>
-          ) : (
-            <span className="status-disconnected">
-              WebSocket Disconnected
-              <button onClick={reconnect} className="reconnect-btn">
-                Reconnect
-              </button>
-            </span>
-          )}
-        </div>
+        <HeaderStatus
+          connectionState={
+            wsState.isConnected ? 'connected' :
+            wsState.isReconnecting ? 'reconnecting' :
+            'disconnected'
+          }
+          reconnectAttempt={wsState.reconnectAttempt}
+          onReconnect={reconnect}
+          state={state}
+        />
       </header>
 
-      <main className="app-main">
-        <div className="top-panels">
-          <StatusPanel state={state} />
-          <PRPanel state={state} />
-        </div>
+      <Drawer
+        state={state}
+        phaseProgress={metrics.phaseProgress}
+        activityMessages={activityMessages}
+      />
 
+      <main className="app-main">
         {/* Progress Tracking Panels */}
         <div className="progress-section">
           <MetricsPanel metrics={metrics} />
-          <ProgressPanel phaseProgress={metrics.phaseProgress} />
           <DependencyGraphFlow
             prs={prsArray || []}
             dependencyGraph={metrics.dependencyGraph}
             criticalPath={metrics.criticalPath}
           />
-        </div>
-
-        <div className="bottom-panel">
-          <ActivityPanel messages={activityMessages} />
         </div>
       </main>
 

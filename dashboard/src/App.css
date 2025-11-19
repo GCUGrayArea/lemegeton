@@ -38,42 +38,6 @@ code {
   color: #58a6ff;
 }
 
-.connection-status {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-}
-
-.status-connected {
-  color: #3fb950;
-}
-
-.status-reconnecting {
-  color: #f0883e;
-}
-
-.status-disconnected {
-  color: #f85149;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.reconnect-btn {
-  background: #238636;
-  color: white;
-  border: none;
-  padding: 0.25rem 0.75rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.85rem;
-}
-
-.reconnect-btn:hover {
-  background: #2ea043;
-}
-
 /* Main Layout */
 .app-main {
   flex: 1;
@@ -81,20 +45,17 @@ code {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+  transition: margin-left 0.3s ease;
 }
 
-.top-panels {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1.5rem;
+/* Adjust main content when drawer is open */
+body.drawer-open .app-main {
+  margin-left: 30%;
 }
 
-.bottom-panel {
-  flex: 0 0 auto;
-  max-height: 400px;
-  min-height: 200px;
-  display: flex;
-  flex-direction: column;
+/* Main content when drawer is closed */
+body.drawer-closed .app-main {
+  margin-left: 0;
 }
 
 .progress-section {
@@ -409,12 +370,16 @@ code {
 
 /* Responsive */
 @media (max-width: 1024px) {
-  .top-panels {
-    grid-template-columns: 1fr;
+  body.drawer-open .app-main {
+    margin-left: 40%;
   }
 
-  .status-grid {
-    grid-template-columns: repeat(4, 1fr);
+  .drawer-open {
+    width: 40%;
+  }
+
+  body.drawer-open .drawer-toggle {
+    left: 40%;
   }
 }
 
@@ -425,8 +390,16 @@ code {
     align-items: flex-start;
   }
 
-  .status-grid {
-    grid-template-columns: repeat(2, 1fr);
+  body.drawer-open .app-main {
+    margin-left: 60%;
+  }
+
+  .drawer-open {
+    width: 60%;
+  }
+
+  body.drawer-open .drawer-toggle {
+    left: 60%;
   }
 
   .activity-item {

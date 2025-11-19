@@ -1,0 +1,118 @@
+.header-status-container {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.connection-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.connection-status .status-indicator {
+  font-size: 10px;
+  line-height: 1;
+}
+
+.status-connected {
+  background-color: rgba(46, 160, 67, 0.1);
+  color: #2ea043;
+}
+
+.status-connected .status-indicator {
+  color: #2ea043;
+}
+
+.status-reconnecting {
+  background-color: rgba(219, 109, 16, 0.1);
+  color: #db6d10;
+}
+
+.status-reconnecting .status-indicator {
+  color: #db6d10;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.status-disconnected {
+  background-color: rgba(218, 54, 51, 0.1);
+  color: #da3633;
+}
+
+.status-disconnected .status-indicator {
+  color: #da3633;
+}
+
+.reconnect-btn {
+  margin-left: 8px;
+  padding: 4px 8px;
+  background-color: #4a9eff;
+  color: white;
+  border: none;
+  border-radius: 3px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.reconnect-btn:hover {
+  background-color: #6ab0ff;
+}
+
+.system-status-inline {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-left: 16px;
+  border-left: 1px solid #333;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  background-color: rgba(255, 255, 255, 0.05);
+}
+
+.status-label {
+  color: #888;
+  font-weight: 500;
+}
+
+.status-value {
+  color: #ccc;
+  font-weight: 600;
+}
+
+.status-item.status-good .status-value {
+  color: #2ea043;
+}
+
+.status-item.status-warning .status-value {
+  color: #db6d10;
+}
+
+.status-item.status-error .status-value {
+  color: #da3633;
+}
+
+.status-item.status-neutral .status-value {
+  color: #4a9eff;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
