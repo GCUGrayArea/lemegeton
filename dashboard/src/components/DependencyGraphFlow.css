@@ -6,8 +6,6 @@
   margin-bottom: 20px;
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 600px;
 }
 
 .dependency-graph-flow h2 {
@@ -26,7 +24,9 @@
   border-radius: 6px;
   overflow: hidden;
   position: relative;
-  min-height: 500px;
+  min-height: 800px;
+  height: 800px; /* Explicit height for React Flow */
+  width: 100%; /* Explicit width */
 }
 
 /* React Flow custom styles */
@@ -146,8 +146,20 @@
   border-color: #2196f3;
 }
 
-.layout-toggle {
+.layout-toggle,
+.reset-view-btn {
   width: 100%;
+}
+
+.reset-view-btn {
+  background: #1a7f1a;
+  color: #fff;
+  border-color: #2ea043;
+}
+
+.reset-view-btn:hover {
+  background: #2ea043;
+  border-color: #3fb950;
 }
 
 /* Legend panel */
@@ -257,7 +269,8 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .flow-container {
-    min-height: 300px;
+    min-height: 400px;
+    height: 400px;
   }
 
   .flow-controls,
