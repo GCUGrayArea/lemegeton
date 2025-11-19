@@ -5,7 +5,7 @@
  * Shows PRs as nodes and dependencies as edges with automatic layout.
  */
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import ReactFlow, {
   Node,
   Edge,
@@ -42,7 +42,7 @@ const getLayoutedElements = (
 ) => {
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
-  dagreGraph.setGraph({ rankdir: direction, nodesep: 80, ranksep: 120 });
+  dagreGraph.setGraph({ rankdir: direction, nodesep: 50, ranksep: 100 });
 
   nodes.forEach((node) => {
     dagreGraph.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
@@ -78,6 +78,7 @@ function DependencyGraphFlowInner({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [layoutDirection, setLayoutDirection] = useState<'TB' | 'LR'>('TB');
   const [filter, setFilter] = useState<'all' | 'critical' | 'roots'>('all');
+  const hasCalledFitView = useRef(false);
 
   // Build nodes and edges from PR data
   const { initialNodes, initialEdges } = useMemo(() => {
@@ -214,12 +215,16 @@ function DependencyGraphFlowInner({
   useEffect(() => {
     setNodes(layoutedNodes);
     setEdges(layoutedEdges);
+    // Reset fitView flag when nodes change (filter, layout direction, etc.)
+    hasCalledFitView.current = false;
   }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
 
-  // Fit view when nodes change or component becomes visible
+  // Fit view when nodes first load
   useEffect(() => {
-    if (nodes.length > 0 && !isCollapsed) {
+    if (nodes.length > 0 && !isCollapsed && !hasCalledFitView.current) {
       console.log('DependencyGraphFlow - Calling fitView with', nodes.length, 'nodes');
+      hasCalledFitView.current = true;
+
       // Delay fitView to ensure container is properly sized
       const timer = setTimeout(() => {
         console.log('DependencyGraphFlow - Executing fitView');
@@ -233,7 +238,8 @@ function DependencyGraphFlowInner({
         } catch (error) {
           console.error('DependencyGraphFlow - fitView error:', error);
         }
-      }, 250);
+      }, 350);
+
       return () => clearTimeout(timer);
     }
   }, [nodes.length, isCollapsed, reactFlowInstance]);
