@@ -148,8 +148,20 @@
   border-color: #2196f3;
 }
 
-.layout-toggle {
+.layout-toggle,
+.reset-view-btn {
   width: 100%;
+}
+
+.reset-view-btn {
+  background: #1a7f1a;
+  color: #fff;
+  border-color: #2ea043;
+}
+
+.reset-view-btn:hover {
+  background: #2ea043;
+  border-color: #3fb950;
 }
 
 /* Legend panel */

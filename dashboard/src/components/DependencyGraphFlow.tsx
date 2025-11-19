@@ -225,10 +225,10 @@ function DependencyGraphFlowInner({
         console.log('DependencyGraphFlow - Executing fitView');
         try {
           reactFlowInstance.fitView({
-            padding: 0.2,
+            padding: 0.1,
             duration: 300,
-            minZoom: 0.1,
-            maxZoom: 1
+            minZoom: 0.5,  // Don't zoom out too far
+            maxZoom: 1.5
           });
         } catch (error) {
           console.error('DependencyGraphFlow - fitView error:', error);
@@ -237,6 +237,16 @@ function DependencyGraphFlowInner({
       return () => clearTimeout(timer);
     }
   }, [nodes.length, isCollapsed, reactFlowInstance]);
+
+  const handleResetView = useCallback(() => {
+    console.log('DependencyGraphFlow - Manual reset view');
+    reactFlowInstance.fitView({
+      padding: 0.1,
+      duration: 300,
+      minZoom: 0.5,
+      maxZoom: 1.5
+    });
+  }, [reactFlowInstance]);
 
   const toggleLayout = useCallback(() => {
     setLayoutDirection((dir) => (dir === 'TB' ? 'LR' : 'TB'));
@@ -271,9 +281,11 @@ function DependencyGraphFlowInner({
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           attributionPosition="bottom-left"
-          minZoom={0.1}
-          maxZoom={2}
+          minZoom={0.5}
+          maxZoom={1.5}
+          defaultViewport={{ x: 0, y: 0, zoom: 1 }}
           fitView
+          fitViewOptions={{ padding: 0.1, minZoom: 0.5, maxZoom: 1.5 }}
           style={{ width: '100%', height: '100%' }}
         >
           <Background color="#333" gap={16} />
@@ -310,6 +322,10 @@ function DependencyGraphFlowInner({
 
             <button className="layout-toggle" onClick={toggleLayout}>
               Layout: {layoutDirection === 'TB' ? 'Top → Bottom' : 'Left → Right'}
+            </button>
+
+            <button className="reset-view-btn" onClick={handleResetView}>
+              🔄 Reset View
             </button>
           </Panel>
 
