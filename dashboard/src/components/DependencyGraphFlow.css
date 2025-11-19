@@ -27,6 +27,8 @@
   overflow: hidden;
   position: relative;
   min-height: 500px;
+  height: 500px; /* Explicit height for React Flow */
+  width: 100%; /* Explicit width */
 }
 
 /* React Flow custom styles */

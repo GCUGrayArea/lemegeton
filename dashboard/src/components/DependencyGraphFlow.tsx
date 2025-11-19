@@ -221,9 +221,20 @@ function DependencyGraphFlowInner({
     if (nodes.length > 0 && !isCollapsed) {
       console.log('DependencyGraphFlow - Calling fitView with', nodes.length, 'nodes');
       // Delay fitView to ensure container is properly sized
-      setTimeout(() => {
-        reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
-      }, 100);
+      const timer = setTimeout(() => {
+        console.log('DependencyGraphFlow - Executing fitView');
+        try {
+          reactFlowInstance.fitView({
+            padding: 0.2,
+            duration: 300,
+            minZoom: 0.1,
+            maxZoom: 1
+          });
+        } catch (error) {
+          console.error('DependencyGraphFlow - fitView error:', error);
+        }
+      }, 250);
+      return () => clearTimeout(timer);
     }
   }, [nodes.length, isCollapsed, reactFlowInstance]);
 
@@ -262,6 +273,8 @@ function DependencyGraphFlowInner({
           attributionPosition="bottom-left"
           minZoom={0.1}
           maxZoom={2}
+          fitView
+          style={{ width: '100%', height: '100%' }}
         >
           <Background color="#333" gap={16} />
           <Controls />
