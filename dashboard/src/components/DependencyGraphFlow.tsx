@@ -77,7 +77,9 @@ export function DependencyGraphFlow({
 
   // Build nodes and edges from PR data
   const { initialNodes, initialEdges } = useMemo(() => {
+    console.log('DependencyGraphFlow - PRs:', prs?.length, 'Graph:', !!dependencyGraph);
     if (!dependencyGraph || !prs || prs.length === 0) {
+      console.log('DependencyGraphFlow - returning empty (no data)');
       return { initialNodes: [], initialEdges: [] };
     }
 
@@ -90,6 +92,8 @@ export function DependencyGraphFlow({
         (pr) => !pr.dependencies || pr.dependencies.length === 0
       );
     }
+
+    console.log('DependencyGraphFlow - Filtered PRs:', filteredPRs.length, 'Filter:', filter);
 
     // Create nodes
     const nodes: Node[] = filteredPRs.map((pr) => {
@@ -185,12 +189,18 @@ export function DependencyGraphFlow({
       });
     });
 
+    console.log('DependencyGraphFlow - Created nodes:', nodes.length, 'edges:', edges.length);
     return { initialNodes: nodes, initialEdges: edges };
   }, [prs, dependencyGraph, criticalPath, filter]);
 
   // Apply layout
   const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() => {
-    return getLayoutedElements(initialNodes, initialEdges, layoutDirection);
+    const result = getLayoutedElements(initialNodes, initialEdges, layoutDirection);
+    console.log('DependencyGraphFlow - Layouted nodes:', result.nodes.length);
+    if (result.nodes.length > 0) {
+      console.log('First node position:', result.nodes[0].position);
+    }
+    return result;
   }, [initialNodes, initialEdges, layoutDirection]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
