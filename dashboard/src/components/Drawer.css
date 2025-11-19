@@ -20,6 +20,9 @@
 .drawer-closed {
   width: 0;
   overflow: hidden;
+  pointer-events: none;
+  background-color: transparent;
+  border: none;
 }
 
 .drawer-tabs {
@@ -72,6 +75,7 @@
   cursor: pointer;
   z-index: 101;
   transition: left 0.3s ease;
+  pointer-events: auto;
 }
 
 /* Position toggle button based on drawer state */
