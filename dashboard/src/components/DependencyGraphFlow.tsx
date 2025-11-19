@@ -82,9 +82,7 @@ function DependencyGraphFlowInner({
 
   // Build nodes and edges from PR data
   const { initialNodes, initialEdges } = useMemo(() => {
-    console.log('DependencyGraphFlow - PRs:', prs?.length, 'Graph:', !!dependencyGraph);
     if (!dependencyGraph || !prs || prs.length === 0) {
-      console.log('DependencyGraphFlow - returning empty (no data)');
       return { initialNodes: [], initialEdges: [] };
     }
 
@@ -97,8 +95,6 @@ function DependencyGraphFlowInner({
         (pr) => !pr.dependencies || pr.dependencies.length === 0
       );
     }
-
-    console.log('DependencyGraphFlow - Filtered PRs:', filteredPRs.length, 'Filter:', filter);
 
     // Create nodes
     const nodes: Node[] = filteredPRs.map((pr) => {
@@ -194,18 +190,12 @@ function DependencyGraphFlowInner({
       });
     });
 
-    console.log('DependencyGraphFlow - Created nodes:', nodes.length, 'edges:', edges.length);
     return { initialNodes: nodes, initialEdges: edges };
   }, [prs, dependencyGraph, criticalPath, filter]);
 
   // Apply layout
   const { nodes: layoutedNodes, edges: layoutedEdges } = useMemo(() => {
-    const result = getLayoutedElements(initialNodes, initialEdges, layoutDirection);
-    console.log('DependencyGraphFlow - Layouted nodes:', result.nodes.length);
-    if (result.nodes.length > 0) {
-      console.log('First node position:', result.nodes[0].position);
-    }
-    return result;
+    return getLayoutedElements(initialNodes, initialEdges, layoutDirection);
   }, [initialNodes, initialEdges, layoutDirection]);
 
   const [nodes, setNodes, onNodesChange] = useNodesState(layoutedNodes);
@@ -222,12 +212,10 @@ function DependencyGraphFlowInner({
   // Fit view when nodes first load
   useEffect(() => {
     if (nodes.length > 0 && !isCollapsed && !hasCalledFitView.current) {
-      console.log('DependencyGraphFlow - Calling fitView with', nodes.length, 'nodes');
       hasCalledFitView.current = true;
 
       // Delay fitView to ensure container is properly sized
       const timer = setTimeout(() => {
-        console.log('DependencyGraphFlow - Executing fitView');
         try {
           reactFlowInstance.fitView({
             padding: 0.1,
@@ -245,7 +233,6 @@ function DependencyGraphFlowInner({
   }, [nodes.length, isCollapsed, reactFlowInstance]);
 
   const handleResetView = useCallback(() => {
-    console.log('DependencyGraphFlow - Manual reset view');
     reactFlowInstance.fitView({
       padding: 0.1,
       duration: 300,
@@ -365,12 +352,6 @@ function DependencyGraphFlowInner({
 
 // Wrapper component that provides ReactFlowProvider context
 export function DependencyGraphFlow(props: DependencyGraphFlowProps) {
-  console.log('DependencyGraphFlow - Component rendering with:', {
-    prsCount: props.prs?.length,
-    hasGraph: !!props.dependencyGraph,
-    criticalPathCount: props.criticalPath?.length
-  });
-
   return (
     <ReactFlowProvider>
       <DependencyGraphFlowInner {...props} />
