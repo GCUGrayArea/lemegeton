@@ -45,17 +45,6 @@ code {
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
-  transition: margin-left 0.3s ease;
-}
-
-/* Adjust main content when drawer is open */
-body.drawer-open .app-main {
-  margin-left: 30%;
-}
-
-/* Main content when drawer is closed */
-body.drawer-closed .app-main {
-  margin-left: 0;
 }
 
 .progress-section {
@@ -370,10 +359,6 @@ body.drawer-closed .app-main {
 
 /* Responsive */
 @media (max-width: 1024px) {
-  body.drawer-open .app-main {
-    margin-left: 40%;
-  }
-
   .drawer-open {
     width: 40%;
   }
@@ -388,10 +373,6 @@ body.drawer-closed .app-main {
     flex-direction: column;
     gap: 1rem;
     align-items: flex-start;
-  }
-
-  body.drawer-open .app-main {
-    margin-left: 60%;
   }
 
   .drawer-open {

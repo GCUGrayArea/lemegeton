@@ -14,7 +14,7 @@ interface DrawerProps {
 type TabType = 'prs' | 'progress' | 'activity';
 
 const Drawer: React.FC<DrawerProps> = ({ state, phaseProgress, activityMessages }) => {
-  const [isOpen, setIsOpen] = useState(true);
+  const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<TabType>('prs');
 
   useEffect(() => {
