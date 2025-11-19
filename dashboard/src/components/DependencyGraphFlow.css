@@ -27,6 +27,8 @@
   overflow: hidden;
   position: relative;
   min-height: 500px;
+  height: 500px; /* Explicit height for React Flow */
+  width: 100%; /* Explicit width */
 }
 
 /* React Flow custom styles */
@@ -146,10 +148,29 @@
   border-color: #2196f3;
 }
 
+<<<<<<< HEAD
 .layout-toggle {
   width: 100%;
 }
 
+=======
+.layout-toggle,
+.reset-view-btn {
+  width: 100%;
+}
+
+.reset-view-btn {
+  background: #1a7f1a;
+  color: #fff;
+  border-color: #2ea043;
+}
+
+.reset-view-btn:hover {
+  background: #2ea043;
+  border-color: #3fb950;
+}
+
+>>>>>>> 4dd711faa4ffcfa4b6d2525d1e60e6719198c359
 /* Legend panel */
 .flow-legend {
   background: #2a2a2a;
