@@ -6,8 +6,6 @@
   margin-bottom: 20px;
   display: flex;
   flex-direction: column;
-  flex: 1 1 auto;
-  min-height: 600px;
 }
 
 .dependency-graph-flow h2 {
@@ -26,8 +24,8 @@
   border-radius: 6px;
   overflow: hidden;
   position: relative;
-  min-height: 500px;
-  height: 500px; /* Explicit height for React Flow */
+  min-height: 800px;
+  height: 800px; /* Explicit height for React Flow */
   width: 100%; /* Explicit width */
 }
 
@@ -271,7 +269,8 @@
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .flow-container {
-    min-height: 300px;
+    min-height: 400px;
+    height: 400px;
   }
 
   .flow-controls,
