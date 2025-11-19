@@ -42,11 +42,7 @@ const getLayoutedElements = (
 ) => {
   const dagreGraph = new dagre.graphlib.Graph();
   dagreGraph.setDefaultEdgeLabel(() => ({}));
-<<<<<<< HEAD
-  dagreGraph.setGraph({ rankdir: direction, nodesep: 80, ranksep: 120 });
-=======
   dagreGraph.setGraph({ rankdir: direction, nodesep: 50, ranksep: 100 });
->>>>>>> 4dd711faa4ffcfa4b6d2525d1e60e6719198c359
 
   nodes.forEach((node) => {
     dagreGraph.setNode(node.id, { width: NODE_WIDTH, height: NODE_HEIGHT });
@@ -82,10 +78,7 @@ function DependencyGraphFlowInner({
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [layoutDirection, setLayoutDirection] = useState<'TB' | 'LR'>('TB');
   const [filter, setFilter] = useState<'all' | 'critical' | 'roots'>('all');
-<<<<<<< HEAD
-=======
   const hasCalledFitView = useRef(false);
->>>>>>> 4dd711faa4ffcfa4b6d2525d1e60e6719198c359
 
   // Build nodes and edges from PR data
   const { initialNodes, initialEdges } = useMemo(() => {
@@ -222,21 +215,6 @@ function DependencyGraphFlowInner({
   useEffect(() => {
     setNodes(layoutedNodes);
     setEdges(layoutedEdges);
-<<<<<<< HEAD
-  }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
-
-  // Fit view when nodes change or component becomes visible
-  useEffect(() => {
-    if (nodes.length > 0 && !isCollapsed) {
-      console.log('DependencyGraphFlow - Calling fitView with', nodes.length, 'nodes');
-      // Delay fitView to ensure container is properly sized
-      setTimeout(() => {
-        reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
-      }, 100);
-    }
-  }, [nodes.length, isCollapsed, reactFlowInstance]);
-
-=======
     // Reset fitView flag when nodes change (filter, layout direction, etc.)
     hasCalledFitView.current = false;
   }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
@@ -276,7 +254,6 @@ function DependencyGraphFlowInner({
     });
   }, [reactFlowInstance]);
 
->>>>>>> 4dd711faa4ffcfa4b6d2525d1e60e6719198c359
   const toggleLayout = useCallback(() => {
     setLayoutDirection((dir) => (dir === 'TB' ? 'LR' : 'TB'));
   }, []);
@@ -310,17 +287,12 @@ function DependencyGraphFlowInner({
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           attributionPosition="bottom-left"
-<<<<<<< HEAD
-          minZoom={0.1}
-          maxZoom={2}
-=======
           minZoom={0.5}
           maxZoom={1.5}
           defaultViewport={{ x: 0, y: 0, zoom: 1 }}
           fitView
           fitViewOptions={{ padding: 0.1, minZoom: 0.5, maxZoom: 1.5 }}
           style={{ width: '100%', height: '100%' }}
->>>>>>> 4dd711faa4ffcfa4b6d2525d1e60e6719198c359
         >
           <Background color="#333" gap={16} />
           <Controls />
@@ -357,13 +329,10 @@ function DependencyGraphFlowInner({
             <button className="layout-toggle" onClick={toggleLayout}>
               Layout: {layoutDirection === 'TB' ? 'Top → Bottom' : 'Left → Right'}
             </button>
-<<<<<<< HEAD
-=======
 
             <button className="reset-view-btn" onClick={handleResetView}>
               🔄 Reset View
             </button>
->>>>>>> 4dd711faa4ffcfa4b6d2525d1e60e6719198c359
           </Panel>
 
           <Panel position="top-right" className="flow-legend">
