@@ -157,6 +157,14 @@ function App() {
     velocityPRsPerDay: 2, // Default velocity
   });
 
+  console.log('App - Metrics calculated:', {
+    hasPrsArray: !!prsArray,
+    prsArrayLength: prsArray?.length,
+    hasPrStates: !!prStates,
+    hasDepGraph: !!metrics.dependencyGraph,
+    criticalPathLength: metrics.criticalPath?.length
+  });
+
   return (
     <div className="app">
       <header className="app-header">

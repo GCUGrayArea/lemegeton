@@ -71,6 +71,12 @@ export function DependencyGraphFlow({
   dependencyGraph,
   criticalPath,
 }: DependencyGraphFlowProps) {
+  console.log('DependencyGraphFlow - Component rendering with:', {
+    prsCount: prs?.length,
+    hasGraph: !!dependencyGraph,
+    criticalPathCount: criticalPath?.length
+  });
+
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [layoutDirection, setLayoutDirection] = useState<'TB' | 'LR'>('TB');
   const [filter, setFilter] = useState<'all' | 'critical' | 'roots'>('all');
