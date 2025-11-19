@@ -14,6 +14,8 @@ import ReactFlow, {
   MiniMap,
   useNodesState,
   useEdgesState,
+  useReactFlow,
+  ReactFlowProvider,
   Panel,
   MarkerType,
 } from 'reactflow';
@@ -66,17 +68,13 @@ const getLayoutedElements = (
   return { nodes: layoutedNodes, edges };
 };
 
-export function DependencyGraphFlow({
+// Inner component that uses React Flow hooks
+function DependencyGraphFlowInner({
   prs,
   dependencyGraph,
   criticalPath,
 }: DependencyGraphFlowProps) {
-  console.log('DependencyGraphFlow - Component rendering with:', {
-    prsCount: prs?.length,
-    hasGraph: !!dependencyGraph,
-    criticalPathCount: criticalPath?.length
-  });
-
+  const reactFlowInstance = useReactFlow();
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [layoutDirection, setLayoutDirection] = useState<'TB' | 'LR'>('TB');
   const [filter, setFilter] = useState<'all' | 'critical' | 'roots'>('all');
@@ -218,6 +216,17 @@ export function DependencyGraphFlow({
     setEdges(layoutedEdges);
   }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
 
+  // Fit view when nodes change or component becomes visible
+  useEffect(() => {
+    if (nodes.length > 0 && !isCollapsed) {
+      console.log('DependencyGraphFlow - Calling fitView with', nodes.length, 'nodes');
+      // Delay fitView to ensure container is properly sized
+      setTimeout(() => {
+        reactFlowInstance.fitView({ padding: 0.2, duration: 300 });
+      }, 100);
+    }
+  }, [nodes.length, isCollapsed, reactFlowInstance]);
+
   const toggleLayout = useCallback(() => {
     setLayoutDirection((dir) => (dir === 'TB' ? 'LR' : 'TB'));
   }, []);
@@ -250,8 +259,6 @@ export function DependencyGraphFlow({
           edges={edges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
-          fitView
-          fitViewOptions={{ padding: 0.2, duration: 200 }}
           attributionPosition="bottom-left"
           minZoom={0.1}
           maxZoom={2}
@@ -318,5 +325,20 @@ export function DependencyGraphFlow({
         </div>
       )}
     </div>
+  );
+}
+
+// Wrapper component that provides ReactFlowProvider context
+export function DependencyGraphFlow(props: DependencyGraphFlowProps) {
+  console.log('DependencyGraphFlow - Component rendering with:', {
+    prsCount: props.prs?.length,
+    hasGraph: !!props.dependencyGraph,
+    criticalPathCount: props.criticalPath?.length
+  });
+
+  return (
+    <ReactFlowProvider>
+      <DependencyGraphFlowInner {...props} />
+    </ReactFlowProvider>
   );
 }
