@@ -1,11 +1,9 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useWebSocket } from './hooks/useWebSocket';
-import { StatusPanel } from './components/StatusPanel';
-import { PRPanel } from './components/PRPanel';
-import { ActivityPanel, ActivityMessage } from './components/ActivityPanel';
+import { ActivityMessage } from './components/ActivityPanel';
 import { MetricsPanel } from './components/MetricsPanel';
-import { ProgressPanel } from './components/ProgressPanel';
 import { DependencyGraphFlow } from './components/DependencyGraphFlow';
+import { Drawer } from './components/Drawer';
 import { useProgressMetrics } from './hooks/useProgressMetrics';
 import './App.css';
 
@@ -157,10 +155,49 @@ function App() {
     velocityPRsPerDay: 2, // Default velocity
   });
 
+  // Status badges for header
+  const statusBadges = useMemo(() => {
+    if (!state) return [];
+    return [
+      {
+        label: 'Mode',
+        value: state.mode || 'UNKNOWN',
+        status: state.mode === 'DISTRIBUTED' ? 'good' : 'warning',
+      },
+      {
+        label: 'Redis',
+        value: state.redis?.connected ? 'Connected' : 'Disconnected',
+        status: state.redis?.connected ? 'good' : 'error',
+      },
+      {
+        label: 'Agents',
+        value: state.agents?.active || 0,
+        status: (state.agents?.active || 0) > 0 ? 'good' : 'neutral',
+      },
+      {
+        label: 'PRs',
+        value: state.prs?.total || 0,
+        status: 'neutral',
+      },
+    ];
+  }, [state]);
+
   return (
     <div className="app">
       <header className="app-header">
         <h1>Lemegeton Dashboard</h1>
+
+        {/* System Status Badges */}
+        <div className="status-badges">
+          {statusBadges.map((badge) => (
+            <div key={badge.label} className={`status-badge status-${badge.status}`}>
+              <span className="badge-label">{badge.label}:</span>
+              <span className="badge-value">{badge.value}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* WebSocket Connection Status */}
         <div className="connection-status">
           {wsState.isConnected ? (
             <span className="status-connected">WebSocket Connected</span>
@@ -179,25 +216,22 @@ function App() {
         </div>
       </header>
 
-      <main className="app-main">
-        <div className="top-panels">
-          <StatusPanel state={state} />
-          <PRPanel state={state} />
-        </div>
+      {/* Drawer with Pull Requests, Phase Progress, and Activity Log */}
+      <Drawer
+        state={state}
+        phaseProgress={metrics.phaseProgress}
+        activityMessages={activityMessages}
+      />
 
+      <main className="app-main">
         {/* Progress Tracking Panels */}
         <div className="progress-section">
           <MetricsPanel metrics={metrics} />
-          <ProgressPanel phaseProgress={metrics.phaseProgress} />
           <DependencyGraphFlow
             prs={prsArray || []}
             dependencyGraph={metrics.dependencyGraph}
             criticalPath={metrics.criticalPath}
           />
-        </div>
-
-        <div className="bottom-panel">
-          <ActivityPanel messages={activityMessages} />
         </div>
       </main>
 
