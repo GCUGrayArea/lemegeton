@@ -343,7 +343,10 @@ export class RedisClient extends EventEmitter {
    */
   public async pSubscribe(pattern: string, handler: (channel: string, message: string) => void): Promise<void> {
     const subClient = this.getSubClient();
-    await subClient.pSubscribe(pattern, handler);
+    // node-redis pSubscribe passes (message, channel), but our API expects (channel, message)
+    await subClient.pSubscribe(pattern, (message: string, channel: string) => {
+      handler(channel, message);
+    });
   }
 
   /**
