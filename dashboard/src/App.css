@@ -655,3 +655,9 @@ code {
   border: none;
   padding: 0;
 }
+
+/* Remove height constraints for content in drawer */
+.drawer-panel .pr-list {
+  max-height: none;
+  flex: 1;
+}
