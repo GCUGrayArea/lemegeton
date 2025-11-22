@@ -79,6 +79,7 @@ function DependencyGraphFlowInner({
   const [layoutDirection, setLayoutDirection] = useState<'TB' | 'LR'>('TB');
   const [filter, setFilter] = useState<'all' | 'critical' | 'roots'>('all');
   const hasCalledFitView = useRef(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Build nodes and edges from PR data
   const { initialNodes, initialEdges } = useMemo(() => {
@@ -209,27 +210,58 @@ function DependencyGraphFlowInner({
     hasCalledFitView.current = false;
   }, [layoutedNodes, layoutedEdges, setNodes, setEdges]);
 
-  // Fit view when nodes first load
+  // Fit view when nodes first load or container resizes
   useEffect(() => {
     if (nodes.length > 0 && !isCollapsed && !hasCalledFitView.current) {
       hasCalledFitView.current = true;
 
       // Delay fitView to ensure container is properly sized
+      // Increased delay to give flex layout time to calculate
       const timer = setTimeout(() => {
         try {
           reactFlowInstance.fitView({
             padding: 0.1,
             duration: 300,
-            minZoom: 0.5,  // Don't zoom out too far
+            minZoom: 0.5,
             maxZoom: 1.5
           });
         } catch (error) {
           console.error('DependencyGraphFlow - fitView error:', error);
         }
-      }, 350);
+      }, 500);
 
       return () => clearTimeout(timer);
     }
+  }, [nodes.length, isCollapsed, reactFlowInstance]);
+
+  // Watch for container resize and refit view
+  useEffect(() => {
+    if (!containerRef.current || isCollapsed) return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      // Only refit if we have nodes and the container has non-zero dimensions
+      if (nodes.length > 0 && containerRef.current) {
+        const rect = containerRef.current.getBoundingClientRect();
+        if (rect.height > 0 && rect.width > 0) {
+          try {
+            reactFlowInstance.fitView({
+              padding: 0.1,
+              duration: 300,
+              minZoom: 0.5,
+              maxZoom: 1.5
+            });
+          } catch (error) {
+            console.error('DependencyGraphFlow - resize fitView error:', error);
+          }
+        }
+      }
+    });
+
+    resizeObserver.observe(containerRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
   }, [nodes.length, isCollapsed, reactFlowInstance]);
 
   const handleResetView = useCallback(() => {
@@ -260,14 +292,14 @@ function DependencyGraphFlowInner({
   }
 
   return (
-    <div className="dependency-graph-flow">
+    <div className={`dependency-graph-flow ${isCollapsed ? 'collapsed' : ''}`}>
       <h2 onClick={() => setIsCollapsed(!isCollapsed)} className="collapsible-header">
         <span className={`chevron ${isCollapsed ? 'collapsed' : ''}`}>▼</span>
         Dependency Graph
       </h2>
 
       {!isCollapsed && (
-        <div className="flow-container">
+        <div className="flow-container" ref={containerRef}>
         <ReactFlow
           nodes={nodes}
           edges={edges}
