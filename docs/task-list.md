@@ -990,7 +990,7 @@ cold_state: completed
 priority: high
 complexity:
   score: 7
-  estimated_minutes: 70 (actual: ~240 minutes)
+  estimated_minutes: 70  # actual: ~240 minutes
   suggested_model: sonnet
   rationale: Complex terminal UI with real-time updates
 dependencies: [PR-014, PR-013]
