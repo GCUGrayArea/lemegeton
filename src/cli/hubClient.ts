@@ -19,7 +19,8 @@ import {
   ShutdownTimeoutError
 } from './errors';
 import { HubStatus, TaskProgress, WorkResult } from './formatters';
-import { PRNode, ColdState } from '../types/pr';
+import { ColdState } from '../types/pr';
+import { PRNode } from '../scheduler/types';
 
 /**
  * Hub start options
@@ -361,7 +362,7 @@ export class HubClient {
           prId,
           success: true,
           duration,
-          message: `Assigned to agent ${agentId}`,
+          output: `Assigned to agent ${agentId}`,
         };
       }
 
@@ -374,7 +375,7 @@ export class HubClient {
         prId,
         success: true,
         duration,
-        message: 'Agent spawned successfully. Full execution tracking not yet implemented.',
+        output: 'Agent spawned successfully. Full execution tracking not yet implemented.',
       };
 
     } catch (error) {
@@ -436,7 +437,7 @@ export class HubClient {
    * Check if PR is in a workable state
    */
   private isPRWorkable(pr: PRNode): boolean {
-    const workableStates: ColdState[] = ['new', 'ready', 'planned', 'in_progress', 'completed', 'broken'];
+    const workableStates: ColdState[] = ['new', 'ready', 'planned', 'completed', 'broken'];
     return workableStates.includes(pr.state);
   }
 
@@ -450,7 +451,6 @@ export class HubClient {
       case 'ready':
         return 'planning';
       case 'planned':
-      case 'in_progress':
       case 'broken':
         return 'worker';
       case 'completed':
