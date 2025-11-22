@@ -50,6 +50,7 @@ export interface RunOptions {
   model?: string;
   budget?: number;
   dryRun?: boolean;
+  timeout?: number;  // Timeout in milliseconds
 }
 
 /**
@@ -261,8 +262,8 @@ export class HubClient {
     const pid = await this.findDaemonPid();
 
     if (pid) {
-      // Daemon mode: Hub is running, use messaging (TODO: Phase 1B)
-      throw new Error('Daemon mode not yet implemented. Please run without Hub daemon for testing.');
+      // Daemon mode: Hub is running, use messaging
+      return this.runInDaemonMode(prId, options);
     } else {
       // In-process mode: No daemon, run Hub in current process
       return this.runInProcess(prId, options);
@@ -273,16 +274,10 @@ export class HubClient {
    * Run all available work
    */
   async runAll(options: RunOptions = {}): Promise<WorkResult[]> {
-    const pid = await this.findDaemonPid();
-
-    if (pid) {
-      // Daemon mode: Hub is running, use messaging (TODO: Phase 1B)
-      throw new Error('Daemon mode not yet implemented. Please run without Hub daemon for testing.');
-    } else {
-      // In-process mode: No daemon, run Hub in current process
-      // TODO: Implement runAllInProcess
-      throw new Error('runAll in-process mode not yet implemented. Use runPR for single PR testing.');
-    }
+    // For both daemon and in-process mode, we need to get the list of workable PRs
+    // For now, we'll iterate through PRs one at a time using runPR
+    // TODO: In the future, this could batch requests or run multiple PRs in parallel
+    throw new Error('runAll not yet implemented. Use runPR for single PR testing.');
   }
 
   /**
@@ -413,6 +408,86 @@ export class HubClient {
         console.log('[HubClient] Stopping Hub...');
         await hub.stop();
       }
+    }
+  }
+
+  /**
+   * Run PR in daemon mode (hub already running)
+   */
+  private async runInDaemonMode(prId: string, options: RunOptions): Promise<WorkResult> {
+    console.log(`[HubClient] Running PR ${prId} in daemon mode...`);
+
+    const startTime = Date.now();
+
+    try {
+      // Connect to Redis
+      await this.ensureRedisConnection();
+
+      // Create unique request ID
+      const requestId = `req-${Date.now()}-${Math.random().toString(36).substring(7)}`;
+
+      // Create work request
+      const { MessageType } = await import('../communication/types');
+      const { MessageBus } = await import('../communication/messageBus');
+      const { CoordinationModeManager } = await import('../core/coordinationMode');
+      const { RedisHealthChecker } = await import('../redis/health');
+
+      // Create MessageBus for CLI
+      const healthChecker = new RedisHealthChecker(this.redis!);
+      healthChecker.start();
+      const modeManager = new CoordinationModeManager(this.redis!, healthChecker);
+      await modeManager.start();
+
+      const messageBus = new MessageBus(this.redis!, modeManager);
+      await messageBus.start();
+
+      // Subscribe to response channel
+      const responseChannel = `hub:work-responses:${requestId}`;
+      const responsePromise = new Promise<WorkResult>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Timeout waiting for hub response'));
+        }, options.timeout || 120000);
+
+        messageBus.subscribe(responseChannel, (message: any) => {
+          clearTimeout(timeout);
+          const result = message.payload || message;
+          resolve(result);
+        });
+      });
+
+      // Send work request to hub
+      const workRequestChannel = 'hub:work-requests';
+      const workRequest = {
+        id: `msg-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        timestamp: Date.now(),
+        type: MessageType.CUSTOM,
+        from: 'cli',
+        payload: {
+          prId,
+          requestId,
+          options,
+        },
+      };
+
+      await messageBus.publish(workRequestChannel, workRequest);
+      console.log(`[HubClient] Sent work request for ${prId}`);
+
+      // Wait for response
+      const result = await responsePromise;
+
+      // Cleanup
+      await messageBus.stop();
+      await modeManager.stop();
+      healthChecker.stop();
+
+      const duration = Date.now() - startTime;
+      console.log(`[HubClient] Completed in ${Math.round(duration / 1000)}s`);
+
+      return result;
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      console.error(`[HubClient] Failed after ${Math.round(duration / 1000)}s:`, error);
+      throw error;
     }
   }
 

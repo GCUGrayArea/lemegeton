@@ -21,7 +21,7 @@ import { loadConfig, LemegetonConfig } from '../config';
 import { DaemonManager } from './daemon';
 import { StartupSequence } from './startup';
 import { ShutdownHandler } from './shutdown';
-import { AgentRegistry, AgentInfo } from './agentRegistry';
+import { AgentRegistry, AgentInfo, AgentType } from './agentRegistry';
 import { MessageBus } from '../communication/messageBus';
 import { Scheduler } from '../scheduler';
 import { AgentSpawner } from './agentSpawner';
@@ -172,6 +172,9 @@ export class Hub extends EventEmitter {
 
       // Start heartbeat monitoring
       this.startHeartbeatMonitoring();
+
+      // Subscribe to work requests (for daemon mode)
+      await this.subscribeToWorkRequests();
 
       // Set up shutdown handlers
       this.setupShutdownHandlers();
@@ -393,6 +396,182 @@ export class Hub extends EventEmitter {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer);
       this.heartbeatTimer = null;
+    }
+  }
+
+  /**
+   * Subscribe to work requests from CLI
+   */
+  private async subscribeToWorkRequests(): Promise<void> {
+    if (!this.messageBus) {
+      return;
+    }
+
+    const channel = 'hub:work-requests';
+    await this.messageBus.subscribe(channel, async (message: any) => {
+      try {
+        console.log('[Hub] Received work request:', message.payload?.prId || message.prId);
+        await this.handleWorkRequest(message);
+      } catch (error) {
+        console.error('[Hub] Error handling work request:', error);
+      }
+    });
+
+    console.log('[Hub] Subscribed to work requests on:', channel);
+  }
+
+  /**
+   * Handle work request from CLI
+   */
+  private async handleWorkRequest(message: any): Promise<void> {
+    const payload = message.payload || message;
+    const { prId, requestId, options = {} } = payload;
+
+    if (!prId || !requestId) {
+      console.error('[Hub] Invalid work request: missing prId or requestId');
+      return;
+    }
+
+    // Check if accepting work
+    if (!this.acceptingWork) {
+      await this.sendWorkResponse(requestId, {
+        success: false,
+        prId,
+        error: 'Hub is shutting down',
+      });
+      return;
+    }
+
+    try {
+      // Get PR from scheduler
+      const prNode = this.scheduler?.getPRNode(prId);
+      if (!prNode) {
+        await this.sendWorkResponse(requestId, {
+          success: false,
+          prId,
+          error: `PR ${prId} not found`,
+        });
+        return;
+      }
+
+      // Determine agent type based on PR state
+      const agentType = this.getAgentTypeForState(prNode.state);
+      if (!agentType) {
+        await this.sendWorkResponse(requestId, {
+          success: false,
+          prId,
+          error: `No agent type for state: ${prNode.state}`,
+        });
+        return;
+      }
+
+      // Spawn agent
+      const spawnedAgent = await this.agentSpawner!.spawnAgent({ agentType });
+      const agentId = spawnedAgent.agentId;
+      console.log(`[Hub] Spawned ${agentType} agent: ${agentId}`);
+
+      // Wait for agent to initialize (2 seconds)
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      // Send assignment to agent
+      const { MessageType } = await import('../communication/types');
+      const assignmentChannel = `agent:${agentId}:assignments`;
+      const assignment = {
+        id: `msg-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        timestamp: Date.now(),
+        type: MessageType.ASSIGNMENT,
+        from: 'hub',
+        to: agentId,
+        payload: {
+          prId: prNode.id,
+          assignedAt: Date.now(),
+          priority: prNode.priority,
+          complexity: prNode.complexity,
+          estimatedDuration: prNode.estimatedMinutes,
+          files: Array.from(prNode.files),
+        },
+      };
+
+      await this.messageBus!.publish(assignmentChannel, assignment);
+      console.log(`[Hub] Assigned ${prId} to ${agentId}`);
+
+      // Subscribe to completion
+      const hubChannel = 'hub:messages';
+      const completionHandler = async (completionMessage: any) => {
+        const agentMsg = completionMessage.payload || completionMessage;
+
+        if (agentMsg.agentId === agentId) {
+          if (agentMsg.type === 'complete') {
+            await this.sendWorkResponse(requestId, agentMsg.result);
+          } else if (agentMsg.type === 'failed') {
+            await this.sendWorkResponse(requestId, {
+              success: false,
+              prId,
+              error: agentMsg.error?.message || 'Agent failed',
+            });
+          }
+        }
+      };
+
+      await this.messageBus!.subscribe(hubChannel, completionHandler);
+
+      // Set timeout
+      const timeout = options.timeout || 120000; // 2 minutes default
+      setTimeout(async () => {
+        await this.sendWorkResponse(requestId, {
+          success: false,
+          prId,
+          error: 'Timeout waiting for completion',
+        });
+      }, timeout);
+    } catch (error) {
+      console.error('[Hub] Error processing work request:', error);
+      await this.sendWorkResponse(requestId, {
+        success: false,
+        prId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
+  /**
+   * Send work response back to CLI
+   */
+  private async sendWorkResponse(requestId: string, result: any): Promise<void> {
+    if (!this.messageBus) {
+      return;
+    }
+
+    const responseChannel = `hub:work-responses:${requestId}`;
+    const { MessageType } = await import('../communication/types');
+
+    const message = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      timestamp: Date.now(),
+      type: MessageType.CUSTOM,
+      from: 'hub',
+      payload: result,
+    };
+
+    await this.messageBus.publish(responseChannel, message);
+    console.log(`[Hub] Sent work response for request ${requestId}`);
+  }
+
+  /**
+   * Get agent type for PR state
+   */
+  private getAgentTypeForState(state: string): AgentType | null {
+    switch (state) {
+      case 'new':
+        return 'planning';
+      case 'planned':
+        return 'worker';
+      case 'implemented':
+        return 'qc';
+      case 'testing':
+        return 'review';
+      default:
+        return null;
     }
   }
 

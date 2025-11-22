@@ -131,6 +131,13 @@ export class Scheduler {
   }
 
   /**
+   * Get a specific PR node by ID
+   */
+  getPRNode(prId: string): PRNode | undefined {
+    return this.dependencyGraph.getNode(prId);
+  }
+
+  /**
    * Check if two PRs conflict
    */
   hasConflict(pr1: string, pr2: string): boolean {
