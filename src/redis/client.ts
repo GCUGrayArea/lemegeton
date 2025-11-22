@@ -370,29 +370,5 @@ export class RedisClient extends EventEmitter {
   }
 }
 
-/**
- * Singleton Redis client instance
- */
-let defaultClient: RedisClient | null = null;
-
-/**
- * Gets or creates the default Redis client
- */
-export function getDefaultRedisClient(): RedisClient {
-  if (!defaultClient) {
-    defaultClient = new RedisClient();
-  }
-  return defaultClient;
-}
-
-/**
- * Resets the default client (mainly for testing)
- */
-export function resetDefaultRedisClient(): void {
-  if (defaultClient) {
-    defaultClient.disconnect().catch(() => {
-      // Ignore errors during reset
-    });
-    defaultClient = null;
-  }
-}
+// Singleton pattern removed - use dependency injection instead
+// Create RedisClient instances explicitly and pass them to components that need them

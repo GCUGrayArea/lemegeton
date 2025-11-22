@@ -59,6 +59,9 @@ export abstract class BaseAgent extends EventEmitter {
   protected startTime: number = 0;
   protected workStartTime: number = 0;
 
+  // Resource cleanup
+  private shutdownTimer: NodeJS.Timeout | null = null;
+
   /**
    * Abstract methods - must be implemented by subclasses
    */
@@ -134,6 +137,12 @@ export abstract class BaseAgent extends EventEmitter {
   async stop(): Promise<void> {
     const timeout = this.config.shutdownTimeout || 5000;
 
+    // Clear any existing shutdown timer
+    if (this.shutdownTimer) {
+      clearTimeout(this.shutdownTimer);
+      this.shutdownTimer = null;
+    }
+
     try {
       // Transition to shutting down
       await this.lifecycle.transition(AgentState.SHUTTING_DOWN);
@@ -151,10 +160,11 @@ export abstract class BaseAgent extends EventEmitter {
 
       this.emit('stopped');
     } catch (error) {
-      // Force shutdown after timeout
-      setTimeout(() => {
+      // Store timer reference for proper cleanup
+      this.shutdownTimer = setTimeout(() => {
         this.lifecycle.forceState(AgentState.STOPPED);
         this.emit('forceStopped');
+        this.shutdownTimer = null;  // Clear reference after firing
       }, timeout);
 
       throw error;
@@ -417,5 +427,31 @@ export abstract class BaseAgent extends EventEmitter {
     this.recovery.on('error', (error) => {
       this.emit('recoveryError', error);
     });
+  }
+
+  /**
+   * Cleanup resources to prevent memory leaks
+   * Should be called when agent is being destroyed
+   */
+  async cleanup(): Promise<void> {
+    // Clear shutdown timer if exists
+    if (this.shutdownTimer) {
+      clearTimeout(this.shutdownTimer);
+      this.shutdownTimer = null;
+    }
+
+    // Stop the agent if not already stopped
+    const currentState = this.lifecycle.getState();
+    if (currentState !== AgentState.STOPPED) {
+      try {
+        await this.stop();
+      } catch (error) {
+        // Cleanup should not throw - log error but continue
+        console.warn(`[Agent ${this.agentId}] Cleanup error during stop:`, error);
+      }
+    }
+
+    // Remove all event listeners to prevent memory leaks
+    this.removeAllListeners();
   }
 }

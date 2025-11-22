@@ -5,7 +5,7 @@
  * auto-spawn functionality, which is critical to the system.
  */
 
-import { RedisClient, RedisConnectionState, getDefaultRedisClient, resetDefaultRedisClient } from '../src/redis/client';
+import { RedisClient, RedisConnectionState } from '../src/redis/client';
 import { RedisHealthChecker, HealthStatus } from '../src/redis/health';
 import { RedisAutoSpawner, AutoSpawnStatus, getDefaultAutoSpawner, resetDefaultAutoSpawner } from '../src/redis/autoSpawn';
 import * as docker from '../src/utils/docker';
@@ -294,7 +294,7 @@ describe('Redis Integration Tests', () => {
         await client.disconnect();
       }
       await resetDefaultAutoSpawner();
-      resetDefaultRedisClient();
+      // Singleton pattern removed - no need to reset
     });
 
     (dockerAvailable ? it : it.skip)('should auto-spawn Redis when not available', async () => {
@@ -446,7 +446,6 @@ describe('Redis Integration Tests', () => {
     (dockerAvailable ? it : it.skip)('should provide seamless Redis availability', async () => {
       // Reset everything
       resetConfig();
-      resetDefaultRedisClient();
       await resetDefaultAutoSpawner();
 
       // Configure for auto-spawn
@@ -465,8 +464,8 @@ describe('Redis Integration Tests', () => {
         }
       });
 
-      // Get default client and spawner
-      const client = getDefaultRedisClient();
+      // Create client and spawner directly (no singleton)
+      const client = new RedisClient();
       const spawner = getDefaultAutoSpawner(client);
 
       // Connect with auto-spawn fallback

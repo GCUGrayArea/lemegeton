@@ -109,6 +109,11 @@ export class Hub extends EventEmitter {
   private heartbeatTimer: NodeJS.Timeout | null = null;
   private acceptingWork: boolean = true;
 
+  // Signal handlers for cleanup
+  private signalHandlers = new Map<NodeJS.Signals, () => void>();
+  private exceptionHandler: ((error: Error) => void) | null = null;
+  private rejectionHandler: ((reason: unknown, promise: Promise<unknown>) => void) | null = null;
+
   constructor(config: HubConfig = {}) {
     super();
     this.config = {
@@ -358,28 +363,58 @@ export class Hub extends EventEmitter {
 
     const shutdownSignals: NodeJS.Signals[] = ['SIGTERM', 'SIGINT', 'SIGHUP'];
 
+    // Store signal handlers for cleanup
     for (const signal of shutdownSignals) {
-      process.on(signal, async () => {
+      const handler = async () => {
         console.log(`[Hub] Received ${signal}`);
         await this.stop();
         process.exit(0);
-      });
+      };
+
+      this.signalHandlers.set(signal, handler);
+      process.on(signal, handler);
     }
 
-    // Handle uncaught errors
-    process.on('uncaughtException', async (error) => {
+    // Store exception handler
+    this.exceptionHandler = async (error: Error) => {
       console.error('[Hub] Uncaught exception:', error);
       this.emit('error', error);
       await this.stop();
       process.exit(1);
-    });
+    };
+    process.on('uncaughtException', this.exceptionHandler);
 
-    process.on('unhandledRejection', async (reason, promise) => {
+    // Store rejection handler
+    this.rejectionHandler = async (reason: unknown, promise: Promise<unknown>) => {
       console.error('[Hub] Unhandled rejection:', reason);
       this.emit('error', new Error(`Unhandled rejection: ${reason}`));
       await this.stop();
       process.exit(1);
-    });
+    };
+    process.on('unhandledRejection', this.rejectionHandler);
+  }
+
+  /**
+   * Remove shutdown handlers to prevent memory leaks
+   */
+  private removeShutdownHandlers(): void {
+    // Remove signal handlers
+    for (const [signal, handler] of this.signalHandlers) {
+      process.off(signal, handler);
+    }
+    this.signalHandlers.clear();
+
+    // Remove exception handler
+    if (this.exceptionHandler) {
+      process.off('uncaughtException', this.exceptionHandler);
+      this.exceptionHandler = null;
+    }
+
+    // Remove rejection handler
+    if (this.rejectionHandler) {
+      process.off('unhandledRejection', this.rejectionHandler);
+      this.rejectionHandler = null;
+    }
   }
 
   /**
@@ -387,6 +422,9 @@ export class Hub extends EventEmitter {
    */
   private async cleanup(): Promise<void> {
     try {
+      // Remove shutdown handlers to prevent memory leaks
+      this.removeShutdownHandlers();
+
       // Stop lease manager (doesn't have a stop method, just cleanup heartbeats)
       if (this.leaseManager) {
         // LeaseManager will be garbage collected

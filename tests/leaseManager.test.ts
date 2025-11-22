@@ -3,7 +3,7 @@
  */
 
 import { LeaseManager, LeaseResult, LeaseConflict } from '../src/core/leaseManager';
-import { RedisClient, getDefaultRedisClient, resetDefaultRedisClient } from '../src/redis/client';
+import { RedisClient } from '../src/redis/client';
 import { RedisAutoSpawner, getDefaultAutoSpawner, resetDefaultAutoSpawner } from '../src/redis/autoSpawn';
 import {
   expandWithPairedFiles,
