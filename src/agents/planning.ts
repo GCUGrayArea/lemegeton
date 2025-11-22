@@ -113,18 +113,20 @@ export class PlanningAgent extends BaseAgent {
     try {
       await redisClient.connect();
 
-      // Fetch PR data from Redis
-      const prKey = `pr:${prId}`;
-      const prDataStr = await redisClient.getClient()?.get(prKey);
+      // Fetch all PRs from Redis state
+      const prsDataStr = await redisClient.getClient()?.get('state:prs');
 
-      if (!prDataStr) {
+      if (!prsDataStr) {
+        await redisClient.disconnect();
         return null;
       }
 
-      const prData = JSON.parse(prDataStr);
+      const prsData = JSON.parse(prsDataStr);
+      const prData = prsData[prId];
+
       await redisClient.disconnect();
 
-      return prData;
+      return prData || null;
     } catch (error) {
       console.error(`[PlanningAgent] Error fetching PR data:`, error);
       await redisClient.disconnect();
@@ -140,7 +142,7 @@ export class PlanningAgent extends BaseAgent {
 
     lines.push(`# Implementation Plan: ${prData.title}`);
     lines.push('');
-    lines.push(`**PR ID:** ${prData.pr_id}`);
+    lines.push(`**PR ID:** ${prData.id}`);
     lines.push(`**Complexity:** ${prData.complexity?.score || 'unknown'} (${prData.complexity?.estimated_minutes || 'unknown'} minutes)`);
     lines.push(`**Suggested Model:** ${prData.complexity?.suggested_model || 'sonnet'}`);
     lines.push('');
@@ -153,14 +155,6 @@ export class PlanningAgent extends BaseAgent {
       for (const dep of prData.dependencies) {
         lines.push(`- ${dep}`);
       }
-      lines.push('');
-    }
-
-    // Description
-    if (prData.description) {
-      lines.push('## Description');
-      lines.push('');
-      lines.push(prData.description);
       lines.push('');
     }
 
@@ -235,19 +229,24 @@ export class PlanningAgent extends BaseAgent {
     try {
       await redisClient.connect();
 
-      // Fetch current PR data
-      const prKey = `pr:${prId}`;
-      const prDataStr = await redisClient.getClient()?.get(prKey);
+      // Fetch all PRs from Redis state
+      const prsDataStr = await redisClient.getClient()?.get('state:prs');
 
-      if (!prDataStr) {
-        throw new Error(`PR ${prId} not found in Redis`);
+      if (!prsDataStr) {
+        throw new Error('No PRs found in Redis state');
       }
 
-      const prData = JSON.parse(prDataStr);
-      prData.cold_state = newState;
+      const prsData = JSON.parse(prsDataStr);
 
-      // Update in Redis
-      await redisClient.getClient()?.set(prKey, JSON.stringify(prData));
+      if (!prsData[prId]) {
+        throw new Error(`PR ${prId} not found in Redis state`);
+      }
+
+      // Update PR state
+      prsData[prId].cold_state = newState;
+
+      // Write back to Redis
+      await redisClient.getClient()?.set('state:prs', JSON.stringify(prsData));
 
       console.log(`[PlanningAgent] Updated ${prId} state to: ${newState}`);
 
