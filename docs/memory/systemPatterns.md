@@ -59,6 +59,130 @@ promise.quit()
 
 ## Testing Patterns
 
+### Adversarial Testing Pattern
+
+**Philosophy**: Implementation and tests are written by DIFFERENT agents on SEPARATE PRs to prevent "tests written to pass" failure mode.
+
+**Pattern Structure**:
+```
+Implementation PR (PR-015) → Test PR (PR-016) → Fix PR (PR-015 reopened)
+   Worker Agent                Test Agent           Worker Agent
+
+   Writes code        →    Tries to break it  →   Fixes bugs found
+   (no tests)              (no impl changes)       (impl only)
+```
+
+**Core Rules**:
+
+Implementation Agents (FORBIDDEN):
+- Write, modify, or create ANY test files (`*.test.ts`, `*.spec.ts`, `tests/*`)
+- Add test cases to existing test suites
+- Fix failing tests by modifying test code
+- Think about "making tests pass" during implementation
+
+Implementation Agents (REQUIRED):
+- Implement exactly to specification
+- Handle edge cases in implementation logic
+- For BROKEN PRs: Fix implementation to match test expectations
+
+Test Agents (FORBIDDEN):
+- Modify implementation code to make tests pass
+- Skip edge cases because they're "hard to test"
+- Write tests that just verify current behavior
+- Make tests pass by lowering coverage requirements
+
+Test Agents (REQUIRED):
+- Study implementation critically - assume it has bugs
+- Test edge cases implementation might have missed:
+  - Boundary values (0, -1, MAX_INT, empty, null, undefined)
+  - Invalid inputs (wrong types, malformed data)
+  - Race conditions and timing issues
+  - Resource exhaustion
+  - Error scenarios (network failures, permissions, etc.)
+- Write tests that SHOULD pass if implementation is correct
+- Don't care if tests fail initially - that's the point
+- Focus on whether test makes sense, not whether it passes
+- Achieve >90% coverage for critical paths
+
+**Success Metrics**:
+- Finding bugs in implementation (tests fail initially) = GOOD
+- All tests pass immediately = SUSPICIOUS (tests too weak?)
+- High edge case coverage = EXCELLENT
+- Tests find issues implementation author missed = IDEAL
+
+**Workflow Example**:
+
+1. **Implementation PR (PR-015)**:
+   ```typescript
+   // Worker agent implements feature
+   // src/auth/AuthService.ts
+   export class AuthService {
+     login(email: string, password: string) {
+       // Implementation without null check
+       return this.validateCredentials(email.toLowerCase(), password);
+     }
+   }
+   ```
+   Status: Committed, marked `completed`
+
+2. **Test PR (PR-016)** (depends on PR-015):
+   ```typescript
+   // Test agent tries to break it
+   // tests/auth/AuthService.test.ts
+   describe('AuthService.login', () => {
+     it('should throw ValidationError when email is null', () => {
+       expect(() => authService.login(null, 'password'))
+         .toThrow(ValidationError);
+     });
+
+     it('should handle SQL injection attempt in username', () => {
+       const malicious = "admin'; DROP TABLE users; --";
+       expect(() => authService.login(malicious, 'pass'))
+         .toThrow(ValidationError);
+     });
+   });
+   ```
+   Tests FAIL → discovers null pointer bug
+   Status: Marks PR-015 as `broken`, documents bug
+
+3. **Fix Implementation (PR-015 reopened)**:
+   ```typescript
+   // Worker agent (same or different) fixes bugs
+   export class AuthService {
+     login(email: string, password: string) {
+       if (!email || !password) {
+         throw new ValidationError('Email and password required');
+       }
+       // Added SQL injection protection
+       if (this.containsSQLInjection(email)) {
+         throw new ValidationError('Invalid email format');
+       }
+       return this.validateCredentials(email.toLowerCase(), password);
+     }
+   }
+   ```
+   Status: Tests now pass, PR-015 marked `completed` again
+
+**Benefits**:
+- Prevents confirmation bias (different agents, different goals)
+- Finds more bugs (adversarial mindset)
+- Better code quality (can't cheat with weak tests)
+- Clear responsibilities (implementation vs test ownership)
+- Realistic testing (tests reflect real-world usage including misuse)
+
+**Test Failure Response**:
+When tests fail:
+1. **Implementation bug?** → Document and mark PR broken (GOOD!)
+2. **Test config issue?** → Fix your mocks/imports/setup
+3. **Spec ambiguity?** → Escalate for clarification
+
+**Edge Case Categories**:
+- Boundary values: Zero, negative, MAX_INT, empty, null, undefined
+- Invalid inputs: Wrong types, malformed data, special characters
+- Error scenarios: Network failures, file system errors, database errors
+- Concurrency: Race conditions, deadlocks, state changes mid-operation
+- Resource limits: Large inputs, memory pressure, deep recursion
+
 ### Docker-Based Integration Testing
 ```typescript
 // Pattern: Real infrastructure over mocks
