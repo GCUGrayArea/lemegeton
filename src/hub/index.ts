@@ -11,17 +11,18 @@
  */
 
 import { EventEmitter } from 'events';
-import { RedisClient, RedisConnectionState } from '../redis/client';
-import { RedisAutoSpawner } from '../redis/autoSpawn';
-import { CoordinationModeManager, CoordinationMode } from '../core/coordinationMode';
+import { RedisClient } from '../redis/client';
+import { CoordinationMode } from '../core/coordinationMode';
 import { StateMachine } from '../core/stateMachine';
 import { LeaseManager } from '../core/leaseManager';
-import { RedisHealthChecker } from '../redis/health';
-import { loadConfig, LemegetonConfig } from '../config';
 import { DaemonManager } from './daemon';
 import { StartupSequence } from './startup';
 import { ShutdownHandler } from './shutdown';
 import { AgentRegistry, AgentInfo } from './agentRegistry';
+import { ConnectionManager } from './connectionManager';
+import { CoordinationSetup } from './coordinationSetup';
+import { StateMachineSetup } from './stateMachineSetup';
+import { HeartbeatMonitor } from './heartbeatMonitor';
 
 /**
  * Hub configuration
@@ -88,19 +89,23 @@ export interface HubEvents {
  */
 export class Hub extends EventEmitter {
   private config: Required<HubConfig>;
-  private redisClient: RedisClient | null = null;
-  private redisAutoSpawner: RedisAutoSpawner | null = null;
-  private healthChecker: RedisHealthChecker | null = null;
-  private coordinationMode: CoordinationModeManager | null = null;
-  private stateMachine: StateMachine | null = null;
-  private leaseManager: LeaseManager | null = null;
+
+  // Managers using composition
+  private connectionManager: ConnectionManager;
+  private coordinationSetup: CoordinationSetup;
+  private stateMachineSetup: StateMachineSetup;
+  private heartbeatMonitor: HeartbeatMonitor;
   private daemonManager: DaemonManager;
-  private startupSequence: StartupSequence | null = null;
   private shutdownHandler: ShutdownHandler;
   private agentRegistry: AgentRegistry;
+  private startupSequence: StartupSequence | null = null;
+
+  // Shared resources
+  private leaseManager: LeaseManager | null = null;
+
+  // State
   private isRunning: boolean = false;
   private shutdownPromise: Promise<void> | null = null;
-  private heartbeatTimer: NodeJS.Timeout | null = null;
   private acceptingWork: boolean = true;
 
   constructor(config: HubConfig = {}) {
@@ -113,9 +118,46 @@ export class Hub extends EventEmitter {
       shutdown: { ...DEFAULT_HUB_CONFIG.shutdown, ...config.shutdown },
     };
 
+    // Initialize managers
+    this.connectionManager = new ConnectionManager({
+      url: this.config.redis.url as string,
+      autoSpawn: this.config.redis.autoSpawn as boolean,
+    });
+
+    this.coordinationSetup = new CoordinationSetup();
+    this.stateMachineSetup = new StateMachineSetup(this);
     this.daemonManager = new DaemonManager(this.config.daemon);
     this.shutdownHandler = new ShutdownHandler(this.config.shutdown);
     this.agentRegistry = new AgentRegistry(this.config.heartbeat);
+
+    this.heartbeatMonitor = new HeartbeatMonitor(
+      this.agentRegistry,
+      {
+        interval: this.config.heartbeat.interval as number,
+        timeout: this.config.heartbeat.timeout as number,
+      }
+    );
+
+    // Setup event forwarding
+    this.setupEventForwarding();
+  }
+
+  /**
+   * Setup event forwarding from managers
+   */
+  private setupEventForwarding(): void {
+    // Forward coordination mode changes
+    this.coordinationSetup.on('modeChanged', (from, to) => {
+      console.log(`[Hub] Coordination mode changed: ${from} → ${to}`);
+      this.emit('mode-changed', from, to);
+    });
+
+    // Forward agent crash events
+    this.heartbeatMonitor.on('agentCrashed', async (agentId) => {
+      console.log(`[Hub] Agent crashed: ${agentId}`);
+      this.emit('agent-crashed', agentId);
+      await this.reclaimWorkFromAgent(agentId);
+    });
   }
 
   /**
@@ -130,20 +172,20 @@ export class Hub extends EventEmitter {
       console.log('[Hub] Starting...');
 
       // Initialize Redis connection
-      await this.initializeRedis();
+      const redisClient = await this.connectionManager.connect();
 
-      // Initialize coordination mode manager
-      await this.initializeCoordination();
+      // Initialize coordination mode and health checking
+      await this.coordinationSetup.initialize(redisClient);
 
       // Initialize state machine
-      await this.initializeStateMachine();
+      this.stateMachineSetup.initialize();
 
       // Initialize lease manager
-      await this.initializeLeaseManager();
+      this.leaseManager = new LeaseManager(redisClient);
 
       // Create startup sequence
       this.startupSequence = new StartupSequence(
-        this.redisClient!,
+        redisClient,
         this.config.daemon.workDir
       );
 
@@ -151,10 +193,10 @@ export class Hub extends EventEmitter {
       await this.startupSequence.hydrateFromGit();
 
       // Initialize agent registry
-      await this.agentRegistry.initialize(this.redisClient!);
+      await this.agentRegistry.initialize(redisClient);
 
       // Start heartbeat monitoring
-      this.startHeartbeatMonitoring();
+      this.heartbeatMonitor.start();
 
       // Set up shutdown handlers
       this.setupShutdownHandlers();
@@ -206,7 +248,7 @@ export class Hub extends EventEmitter {
     this.acceptingWork = false;
 
     // Stop heartbeat monitoring
-    this.stopHeartbeatMonitoring();
+    this.heartbeatMonitor.stop();
 
     // Perform graceful shutdown
     if (this.config.shutdown.graceful) {
@@ -221,124 +263,6 @@ export class Hub extends EventEmitter {
 
     this.emit('stopped');
     console.log('[Hub] Stopped');
-  }
-
-  /**
-   * Initialize Redis connection
-   */
-  private async initializeRedis(): Promise<void> {
-    const appConfig = loadConfig();
-
-    // Use singleton Redis client
-    this.redisClient = new RedisClient(
-      appConfig.redis?.url || this.config.redis.url
-    );
-
-    // If autoSpawn is enabled, try to spawn Redis Docker container if needed
-    if (this.config.redis.autoSpawn) {
-      this.redisAutoSpawner = new RedisAutoSpawner(this.redisClient);
-
-      try {
-        console.log('[Hub] Attempting to connect to Redis (with auto-spawn if needed)...');
-        await this.redisAutoSpawner.connectWithFallback(this.redisClient);
-        console.log('[Hub] Redis connection established');
-      } catch (error) {
-        console.error('[Hub] Failed to connect to Redis even with auto-spawn:', error);
-        throw error;
-      }
-    } else {
-      // Connect normally without auto-spawn
-      if (this.redisClient.getState() !== RedisConnectionState.CONNECTED) {
-        await this.redisClient.connect();
-      }
-    }
-  }
-
-  /**
-   * Initialize coordination mode manager
-   */
-  private async initializeCoordination(): Promise<void> {
-    // Create health checker
-    this.healthChecker = new RedisHealthChecker(this.redisClient!);
-    this.healthChecker.start();
-
-    // Create coordination mode manager
-    this.coordinationMode = new CoordinationModeManager(
-      this.redisClient!,
-      this.healthChecker
-    );
-
-    // Start coordination mode manager
-    await this.coordinationMode.start();
-
-    // Listen for mode changes
-    this.coordinationMode.on('modeChanged', (from, to) => {
-      console.log(`[Hub] Coordination mode changed: ${from} → ${to}`);
-      this.emit('mode-changed', from, to);
-    });
-  }
-
-  /**
-   * Initialize state machine
-   */
-  private async initializeStateMachine(): Promise<void> {
-    // Create git committer (simplified for now)
-    const gitCommitter = {
-      commit: async (message: string, metadata: any) => {
-        console.log(`[Hub] Would commit: ${message}`);
-        console.log(`[Hub] Metadata:`, metadata);
-        // TODO: Implement actual git operations in PR-010
-      }
-    };
-
-    // Create state event emitter (uses hub's event emitter)
-    const stateEventEmitter = {
-      emit: (event: string, ...args: any[]) => {
-        this.emit(event, ...args);
-      }
-    };
-
-    this.stateMachine = new StateMachine(gitCommitter, stateEventEmitter);
-  }
-
-  /**
-   * Initialize lease manager
-   */
-  private async initializeLeaseManager(): Promise<void> {
-    this.leaseManager = new LeaseManager(this.redisClient!);
-    // LeaseManager doesn't have a start method - it's ready to use immediately
-  }
-
-  /**
-   * Start heartbeat monitoring
-   */
-  private startHeartbeatMonitoring(): void {
-    this.heartbeatTimer = setInterval(async () => {
-      try {
-        // Check for crashed agents
-        const crashed = await this.agentRegistry.checkForCrashedAgents();
-
-        for (const agentId of crashed) {
-          console.log(`[Hub] Agent crashed: ${agentId}`);
-          this.emit('agent-crashed', agentId);
-
-          // Reclaim work from crashed agent
-          await this.reclaimWorkFromAgent(agentId);
-        }
-      } catch (error) {
-        console.error('[Hub] Heartbeat monitoring error:', error);
-      }
-    }, this.config.heartbeat.interval);
-  }
-
-  /**
-   * Stop heartbeat monitoring
-   */
-  private stopHeartbeatMonitoring(): void {
-    if (this.heartbeatTimer) {
-      clearInterval(this.heartbeatTimer);
-      this.heartbeatTimer = null;
-    }
   }
 
   /**
@@ -384,27 +308,14 @@ export class Hub extends EventEmitter {
       // Stop lease manager (doesn't have a stop method, just cleanup heartbeats)
       if (this.leaseManager) {
         // LeaseManager will be garbage collected
+        this.leaseManager = null;
       }
 
-      // Stop coordination mode manager
-      if (this.coordinationMode) {
-        await this.coordinationMode.stop();
-      }
+      // Stop coordination setup (includes mode manager and health checker)
+      await this.coordinationSetup.stop();
 
-      // Stop health checker
-      if (this.healthChecker) {
-        this.healthChecker.stop();
-      }
-
-      // Disconnect Redis
-      if (this.redisClient) {
-        await this.redisClient.disconnect();
-      }
-
-      // Clean up auto-spawned Redis container
-      if (this.redisAutoSpawner) {
-        await this.redisAutoSpawner.cleanup();
-      }
+      // Disconnect Redis and cleanup
+      await this.connectionManager.disconnect();
     } catch (error) {
       console.error('[Hub] Cleanup error:', error);
     }
@@ -443,7 +354,8 @@ export class Hub extends EventEmitter {
     }
 
     // Update PR state (transition to 'available' or appropriate state)
-    if (this.stateMachine) {
+    const stateMachine = this.stateMachineSetup.getStateMachine();
+    if (stateMachine) {
       // TODO: Implement state transition logic
     }
 
@@ -519,14 +431,21 @@ export class Hub extends EventEmitter {
    * Get Redis client (for testing)
    */
   getRedisClient(): RedisClient | null {
-    return this.redisClient;
+    return this.connectionManager.getClient();
   }
 
   /**
    * Get coordination mode
    */
   getCoordinationMode(): CoordinationMode | null {
-    return this.coordinationMode?.getMode() || null;
+    return this.coordinationSetup.getMode();
+  }
+
+  /**
+   * Get state machine (for testing)
+   */
+  getStateMachine(): StateMachine | null {
+    return this.stateMachineSetup.getStateMachine();
   }
 }
 
