@@ -45,6 +45,7 @@ export interface ProgressMetrics {
   cyclesDetected: string[][];
   readyPRs: string[];
   criticalPath: string[];
+  criticalPathCompleted: number;
 
   // Dependency graph instance (for further analysis)
   dependencyGraph: DependencyGraph | null;
@@ -85,6 +86,7 @@ export function useProgressMetrics({
         cyclesDetected: [],
         readyPRs: [],
         criticalPath: [],
+        criticalPathCompleted: 0,
         dependencyGraph: null,
       };
     }
@@ -153,6 +155,12 @@ export function useProgressMetrics({
     // Get critical path
     const criticalPath = dependencyGraph.getCriticalPath();
 
+    // Count completed PRs in critical path
+    const criticalPathCompleted = criticalPath.filter((prId) => {
+      const state = statesMap.get(prId);
+      return state?.coldState === 'completed' || state?.coldState === 'approved';
+    }).length;
+
     // Calculate completion estimate
     const estimate = dependencyGraph.estimateCompletion(statesMap, velocityPRsPerDay);
 
@@ -177,6 +185,7 @@ export function useProgressMetrics({
       cyclesDetected,
       readyPRs,
       criticalPath,
+      criticalPathCompleted,
       dependencyGraph,
     };
   }, [prs, states, velocityPRsPerDay]);

@@ -93,10 +93,10 @@ export function MetricsPanel({ metrics }: MetricsPanelProps) {
         <div className="metric-card critical">
           <div className="metric-label">Critical Path</div>
           <div className="metric-value-sm">
-            {formatHours(metrics.criticalPathHours)}
+            {metrics.criticalPathCompleted}/{metrics.criticalPath.length}
           </div>
           <div className="metric-detail">
-            {metrics.criticalPath.length} PRs in sequence
+            PRs completed
           </div>
         </div>
 

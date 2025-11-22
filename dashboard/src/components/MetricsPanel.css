@@ -16,8 +16,8 @@
 
 .metrics-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 15px;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 12px;
   margin-bottom: 20px;
 }
 
@@ -25,7 +25,7 @@
   background: #2a2a2a;
   border: 1px solid #444;
   border-radius: 6px;
-  padding: 15px;
+  padding: 12px 8px;
   text-align: center;
   transition: transform 0.2s, box-shadow 0.2s;
 }
@@ -57,32 +57,32 @@
 }
 
 .metric-label {
-  font-size: 0.85em;
+  font-size: 0.75em;
   color: #999;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
   text-transform: uppercase;
-  letter-spacing: 0.5px;
+  letter-spacing: 0.3px;
 }
 
 .metric-value {
-  font-size: 2.5em;
+  font-size: 2em;
   font-weight: bold;
   color: #fff;
-  margin: 5px 0;
+  margin: 4px 0;
   line-height: 1;
 }
 
 .metric-value-sm {
-  font-size: 1.5em;
+  font-size: 1.2em;
   font-weight: bold;
   color: #fff;
-  margin: 5px 0;
+  margin: 4px 0;
 }
 
 .metric-detail {
-  font-size: 0.8em;
+  font-size: 0.7em;
   color: #666;
-  margin-top: 8px;
+  margin-top: 6px;
 }
 
 /* Alerts */
@@ -133,13 +133,9 @@
 }
 
 /* Responsive adjustments */
-@media (max-width: 1200px) {
+@media (max-width: 1400px) {
   .metrics-grid {
-    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  }
-
-  .metric-value {
-    font-size: 2em;
+    grid-template-columns: repeat(4, 1fr);
   }
 }
 
