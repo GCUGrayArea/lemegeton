@@ -8,6 +8,7 @@
 import { createClient, RedisClientType, RedisFunctions, RedisModules, RedisScripts } from 'redis';
 import { EventEmitter } from 'events';
 import { getConfig, getRedisUrl } from '../config';
+import { RedisError, ErrorCode } from '../types';
 
 /**
  * Type alias for the Redis client
@@ -75,7 +76,10 @@ export class RedisClient extends EventEmitter {
    */
   public getClient(): LemegetonRedisClient {
     if (!this.client || !this.isConnected()) {
-      throw new Error('Redis client not connected');
+      throw RedisError.connectionFailed(this.url, {
+        state: this.state,
+        operation: 'getClient',
+      });
     }
     return this.client;
   }
@@ -85,7 +89,10 @@ export class RedisClient extends EventEmitter {
    */
   public getPubClient(): LemegetonRedisClient {
     if (!this.pubClient || !this.isConnected()) {
-      throw new Error('Redis pub client not connected');
+      throw RedisError.connectionFailed(this.url, {
+        state: this.state,
+        operation: 'getPubClient',
+      });
     }
     return this.pubClient;
   }
@@ -95,7 +102,10 @@ export class RedisClient extends EventEmitter {
    */
   public getSubClient(): LemegetonRedisClient {
     if (!this.subClient || !this.isConnected()) {
-      throw new Error('Redis sub client not connected');
+      throw RedisError.connectionFailed(this.url, {
+        state: this.state,
+        operation: 'getSubClient',
+      });
     }
     return this.subClient;
   }

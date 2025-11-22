@@ -366,9 +366,14 @@ export class Hub extends EventEmitter {
     // Store signal handlers for cleanup
     for (const signal of shutdownSignals) {
       const handler = async () => {
-        console.log(`[Hub] Received ${signal}`);
-        await this.stop();
-        process.exit(0);
+        try {
+          console.log(`[Hub] Received ${signal}`);
+          await this.stop();
+          process.exit(0);
+        } catch (error) {
+          console.error(`[Hub] Error during ${signal} shutdown:`, error);
+          process.exit(1);
+        }
       };
 
       this.signalHandlers.set(signal, handler);
@@ -377,80 +382,122 @@ export class Hub extends EventEmitter {
 
     // Store exception handler
     this.exceptionHandler = async (error: Error) => {
-      console.error('[Hub] Uncaught exception:', error);
-      this.emit('error', error);
-      await this.stop();
-      process.exit(1);
+      try {
+        console.error('[Hub] Uncaught exception:', error);
+        this.emit('error', error);
+        await this.stop();
+      } catch (stopError) {
+        console.error('[Hub] Error during exception shutdown:', stopError);
+      } finally {
+        process.exit(1);
+      }
     };
     process.on('uncaughtException', this.exceptionHandler);
 
     // Store rejection handler
     this.rejectionHandler = async (reason: unknown, promise: Promise<unknown>) => {
-      console.error('[Hub] Unhandled rejection:', reason);
-      this.emit('error', new Error(`Unhandled rejection: ${reason}`));
-      await this.stop();
-      process.exit(1);
+      try {
+        console.error('[Hub] Unhandled rejection:', reason);
+        this.emit('error', new Error(`Unhandled rejection: ${reason}`));
+        await this.stop();
+      } catch (stopError) {
+        console.error('[Hub] Error during rejection shutdown:', stopError);
+      } finally {
+        process.exit(1);
+      }
     };
     process.on('unhandledRejection', this.rejectionHandler);
   }
 
   /**
    * Remove shutdown handlers to prevent memory leaks
+   * This method never throws - it logs errors and continues cleanup
    */
   private removeShutdownHandlers(): void {
-    // Remove signal handlers
-    for (const [signal, handler] of this.signalHandlers) {
-      process.off(signal, handler);
+    try {
+      // Remove signal handlers
+      for (const [signal, handler] of this.signalHandlers) {
+        try {
+          process.off(signal, handler);
+        } catch (error) {
+          console.error(`[Hub] Failed to remove signal handler for ${signal}:`, error);
+        }
+      }
+      this.signalHandlers.clear();
+    } catch (error) {
+      console.error('[Hub] Failed to clear signal handlers:', error);
     }
-    this.signalHandlers.clear();
 
-    // Remove exception handler
-    if (this.exceptionHandler) {
-      process.off('uncaughtException', this.exceptionHandler);
-      this.exceptionHandler = null;
+    try {
+      // Remove exception handler
+      if (this.exceptionHandler) {
+        process.off('uncaughtException', this.exceptionHandler);
+        this.exceptionHandler = null;
+      }
+    } catch (error) {
+      console.error('[Hub] Failed to remove exception handler:', error);
     }
 
-    // Remove rejection handler
-    if (this.rejectionHandler) {
-      process.off('unhandledRejection', this.rejectionHandler);
-      this.rejectionHandler = null;
+    try {
+      // Remove rejection handler
+      if (this.rejectionHandler) {
+        process.off('unhandledRejection', this.rejectionHandler);
+        this.rejectionHandler = null;
+      }
+    } catch (error) {
+      console.error('[Hub] Failed to remove rejection handler:', error);
     }
   }
 
   /**
    * Clean up resources
+   * This method never throws - it logs errors and continues cleanup
    */
   private async cleanup(): Promise<void> {
-    try {
-      // Remove shutdown handlers to prevent memory leaks
-      this.removeShutdownHandlers();
+    const errors: Array<{ operation: string; error: Error }> = [];
 
-      // Stop lease manager (doesn't have a stop method, just cleanup heartbeats)
-      if (this.leaseManager) {
-        // LeaseManager will be garbage collected
+    // Helper to safely execute cleanup operations
+    const safeCleanup = async (operation: string, fn: () => void | Promise<void>): Promise<void> => {
+      try {
+        await fn();
+      } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        errors.push({ operation, error: err });
+        console.error(`[Hub] Cleanup error (${operation}):`, error);
       }
+    };
 
-      // Stop coordination mode manager
-      if (this.coordinationMode) {
-        await this.coordinationMode.stop();
-      }
+    // Remove shutdown handlers to prevent memory leaks
+    await safeCleanup('removeShutdownHandlers', () => this.removeShutdownHandlers());
 
-      // Stop health checker
-      if (this.healthChecker) {
-        this.healthChecker.stop();
-      }
+    // Stop lease manager (doesn't have a stop method, just cleanup heartbeats)
+    if (this.leaseManager) {
+      // LeaseManager will be garbage collected
+    }
 
-      // Disconnect Redis
-      if (this.redisClient) {
-        await this.redisClient.disconnect();
-      }
+    // Stop coordination mode manager
+    if (this.coordinationMode) {
+      await safeCleanup('coordinationMode.stop', () => this.coordinationMode!.stop());
+    }
 
-      // Clean up auto-spawned Redis container
-      if (this.redisAutoSpawner) {
-        await this.redisAutoSpawner.cleanup();
-      }
-    } catch (error) {
-      console.error('[Hub] Cleanup error:', error);
+    // Stop health checker
+    if (this.healthChecker) {
+      await safeCleanup('healthChecker.stop', () => this.healthChecker!.stop());
+    }
+
+    // Disconnect Redis
+    if (this.redisClient) {
+      await safeCleanup('redisClient.disconnect', () => this.redisClient!.disconnect());
+    }
+
+    // Clean up auto-spawned Redis container
+    if (this.redisAutoSpawner) {
+      await safeCleanup('redisAutoSpawner.cleanup', () => this.redisAutoSpawner!.cleanup());
+    }
+
+    // Log summary if there were errors
+    if (errors.length > 0) {
+      console.error(`[Hub] Cleanup completed with ${errors.length} error(s)`);
     }
   }
 

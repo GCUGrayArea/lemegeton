@@ -128,6 +128,37 @@ export {
 } from './prompts';
 
 // ============================================================================
+// Error Hierarchy
+// ============================================================================
+
+export {
+  ErrorCode
+} from './errors';
+
+export type {
+  ErrorContext
+} from './errors';
+
+export {
+  LemegetonError,
+  StateError,
+  LeaseError,
+  CostError,
+  RedisError,
+  CoordinationError,
+  AgentError,
+  ConfigError,
+  isLemegetonError,
+  wrapError
+} from './errors';
+
+// Re-export error utilities from both modules
+export {
+  getErrorCode as getErrorCodeFromGuards,
+  getErrorContext
+} from './errors';
+
+// ============================================================================
 // Type Guards
 // ============================================================================
 

@@ -9,7 +9,7 @@
  * the Hub or agents, not here.
  */
 
-import { HotState, ColdState, PRState, PRTransition, isColdState } from '../types';
+import { HotState, ColdState, PRState, PRTransition, isColdState, StateError, ErrorCode } from '../types';
 import {
   isValidTransition,
   validateTransition,
@@ -100,6 +100,20 @@ export interface TransitionResult {
 }
 
 /**
+ * Event emission error tracking
+ */
+export interface EventEmissionError {
+  /** PR identifier */
+  pr_id: string;
+  /** Timestamp of failure */
+  timestamp: Date;
+  /** Error that occurred */
+  error: Error;
+  /** Event data that failed to emit */
+  eventData: StateTransitionEvent;
+}
+
+/**
  * State Machine for PR lifecycle management.
  *
  * Responsibilities:
@@ -115,6 +129,8 @@ export interface TransitionResult {
 export class StateMachine {
   private gitCommitter?: IGitCommitter;
   private eventEmitter?: IStateEventEmitter;
+  private eventEmissionErrors: EventEmissionError[] = [];
+  private readonly MAX_TRACKED_ERRORS = 100;
 
   /**
    * Create a new state machine.
@@ -193,7 +209,7 @@ export class StateMachine {
     // Emit event (before commit for observability)
     if (this.eventEmitter) {
       try {
-        this.eventEmitter.emit('state_transition', {
+        const eventData: StateTransitionEvent = {
           pr_id: prId,
           from: fromState,
           to: toState,
@@ -201,8 +217,26 @@ export class StateMachine {
           timestamp,
           committed: needsCommit,
           reason
-        });
+        };
+        this.eventEmitter.emit('state_transition', eventData);
       } catch (error) {
+        // Track event emission failure for observability
+        const emissionError: EventEmissionError = {
+          pr_id: prId,
+          timestamp: new Date(),
+          error: error instanceof Error ? error : new Error(String(error)),
+          eventData: {
+            pr_id: prId,
+            from: fromState,
+            to: toState,
+            agent_id: agentId,
+            timestamp,
+            committed: needsCommit,
+            reason
+          }
+        };
+
+        this.trackEventEmissionError(emissionError);
         console.warn(`[StateMachine] Failed to emit event for ${prId}:`, error);
         // Don't fail transition if event emission fails
       }
@@ -212,11 +246,18 @@ export class StateMachine {
     if (needsCommit && this.gitCommitter) {
       // Verify toState is actually a cold state (type-safe runtime check)
       if (!isColdState(toState)) {
-        console.error(`[StateMachine] needsCommit is true but toState is not cold: ${toState}`);
+        const stateError = StateError.invalidState(toState, {
+          pr_id: prId,
+          from_state: fromState,
+          to_state: toState,
+          reason: 'needsCommit requires cold state',
+          agent_id: agentId,
+        });
+        console.error(`[StateMachine] ${stateError.message}`);
         return {
           success: false,
           new_state: fromState,
-          error: `Invalid state: needsCommit requires cold state, got ${toState}`,
+          error: stateError.message,
           committed: false,
           transition
         };
@@ -237,11 +278,21 @@ export class StateMachine {
         await this.gitCommitter.commit(commitMessage, metadata);
         console.log(`[StateMachine] Committed ${prId}: ${fromState} → ${toState}`);
       } catch (error) {
-        console.error(`[StateMachine] Git commit failed for ${prId}:`, error);
+        const syncError = StateError.syncFailed(
+          'Git commit failed',
+          {
+            pr_id: prId,
+            from_state: fromState,
+            to_state: toState,
+            agent_id: agentId,
+          },
+          error instanceof Error ? error : undefined
+        );
+        console.error(`[StateMachine] ${syncError.message}:`, error);
         return {
           success: false,
           new_state: fromState,
-          error: `Git commit failed: ${error}`,
+          error: syncError.message,
           committed: false,
           transition
         };
@@ -311,6 +362,37 @@ export class StateMachine {
     to: HotState | ColdState
   ): boolean {
     return requiresCommitFromRules(from, to);
+  }
+
+  /**
+   * Get all tracked event emission errors.
+   *
+   * @returns Array of event emission errors
+   */
+  getEventEmissionErrors(): readonly EventEmissionError[] {
+    return [...this.eventEmissionErrors];
+  }
+
+  /**
+   * Clear all tracked event emission errors.
+   */
+  clearEventEmissionErrors(): void {
+    this.eventEmissionErrors = [];
+  }
+
+  /**
+   * Track an event emission error.
+   * Maintains a rolling window of the most recent errors.
+   *
+   * @param error - Event emission error to track
+   */
+  private trackEventEmissionError(error: EventEmissionError): void {
+    this.eventEmissionErrors.push(error);
+
+    // Keep only the most recent errors to prevent memory leaks
+    if (this.eventEmissionErrors.length > this.MAX_TRACKED_ERRORS) {
+      this.eventEmissionErrors.shift();
+    }
   }
 
   /**
