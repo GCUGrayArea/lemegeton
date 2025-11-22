@@ -214,20 +214,42 @@ function DependencyGraphFlowInner({
     if (nodes.length > 0 && !isCollapsed && !hasCalledFitView.current) {
       hasCalledFitView.current = true;
 
-      // Delay fitView to ensure container is properly sized
-      const timer = setTimeout(() => {
+      // Retry fitView until container has a proper size
+      let attempts = 0;
+      const maxAttempts = 10;
+
+      const attemptFitView = () => {
+        attempts++;
+
         try {
-          reactFlowInstance.fitView({
-            padding: 0.1,
-            duration: 300,
-            minZoom: 0.5,  // Don't zoom out too far
-            maxZoom: 1.5
-          });
+          // Check if container has been sized
+          const container = document.querySelector('.flow-container');
+          if (container) {
+            const rect = container.getBoundingClientRect();
+
+            // If container has height, fit the view
+            if (rect.height > 100) {
+              reactFlowInstance.fitView({
+                padding: 0.1,
+                duration: 300,
+                minZoom: 0.5,
+                maxZoom: 1.5
+              });
+              return;
+            }
+          }
+
+          // Retry if container not sized yet and we haven't exceeded max attempts
+          if (attempts < maxAttempts) {
+            setTimeout(attemptFitView, 100);
+          }
         } catch (error) {
           console.error('DependencyGraphFlow - fitView error:', error);
         }
-      }, 350);
+      };
 
+      // Start attempting fitView after initial delay
+      const timer = setTimeout(attemptFitView, 100);
       return () => clearTimeout(timer);
     }
   }, [nodes.length, isCollapsed, reactFlowInstance]);
