@@ -13,7 +13,7 @@ type TabType = 'prs' | 'progress' | 'activity';
 
 export function Drawer({ state, phaseProgress, activityMessages }: DrawerProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>('prs');
+  const [activeTab, setActiveTab] = useState<TabType>('progress');
 
   const toggleDrawer = () => {
     setIsOpen(!isOpen);
@@ -46,16 +46,16 @@ export function Drawer({ state, phaseProgress, activityMessages }: DrawerProps) 
         {/* Tabs */}
         <div className="drawer-tabs">
           <button
-            className={`drawer-tab ${activeTab === 'prs' ? 'active' : ''}`}
-            onClick={() => setActiveTab('prs')}
-          >
-            Pull Requests
-          </button>
-          <button
             className={`drawer-tab ${activeTab === 'progress' ? 'active' : ''}`}
             onClick={() => setActiveTab('progress')}
           >
             Phase Progress
+          </button>
+          <button
+            className={`drawer-tab ${activeTab === 'prs' ? 'active' : ''}`}
+            onClick={() => setActiveTab('prs')}
+          >
+            Pull Requests
           </button>
           <button
             className={`drawer-tab ${activeTab === 'activity' ? 'active' : ''}`}
