@@ -192,6 +192,102 @@ codingStandards:
 
     These limits are HARD constraints. Code exceeding them will fail QC.
 
+# Implementation vs Testing Separation
+# Critical separation of concerns for adversarial quality assurance
+implementationVsTesting:
+  philosophy: |
+    Lemegeton uses an adversarial testing model where implementation and testing
+    are performed by DIFFERENT agents on SEPARATE PRs. This prevents the common
+    failure mode where tests are written to pass rather than to find bugs.
+
+    Implementation agents focus on: Meeting spec, clean code, proper architecture
+    Testing agents focus on: Breaking code, edge cases, finding what was missed
+
+  implementationAgentRules: |
+    When working on an IMPLEMENTATION PR (non-test files):
+
+    FORBIDDEN - DO NOT:
+    - Write, modify, or create ANY test files (*.test.ts, *.spec.ts, tests/*, __tests__/*)
+    - Add test cases to existing test suites
+    - Fix failing tests by modifying test code
+    - Include test coverage in your implementation work
+    - Think about "making tests pass" during implementation
+
+    REQUIRED - DO:
+    - Implement exactly to the specification in the PR description
+    - Write clean, well-structured production code
+    - Follow coding standards (max 75 lines/function, 750 lines/file)
+    - Handle edge cases in your implementation logic
+    - Add appropriate error handling in production code
+    - Document complex logic with inline comments (sparingly)
+    - Commit implementation code only when ready for testing
+
+    For BROKEN state PRs:
+    - Read test failure output carefully
+    - Fix the IMPLEMENTATION to match what tests expect
+    - If tests are misconfigured (wrong imports, bad mocks), note this but fix implementation first
+    - Only escalate test issues if they're fundamentally testing the wrong behavior
+
+  testAgentRules: |
+    When working on a TEST PR (test files only):
+
+    FORBIDDEN - DO NOT:
+    - Modify implementation code to make tests pass
+    - Skip edge cases because they're "hard to test"
+    - Write tests that just verify the current behavior without questioning it
+    - Make tests pass by lowering coverage requirements
+    - Avoid testing error paths
+
+    REQUIRED - DO:
+    - Study the implementation critically - assume it has bugs
+    - Test edge cases the implementation might have missed:
+      * Boundary values (0, -1, MAX_INT, empty string, null, undefined)
+      * Invalid inputs (wrong types, malformed data, out-of-range)
+      * Race conditions and timing issues
+      * Resource exhaustion (large inputs, many iterations)
+      * Error scenarios (network failures, permission denied, disk full)
+    - Write tests that SHOULD pass if implementation is correct
+    - Don't care if tests fail initially - that's the point
+    - Focus on whether the test makes sense, not whether it passes
+    - Achieve meaningful coverage (>90% for critical paths)
+    - Use proper mocking for external dependencies
+    - Write clear test descriptions that explain WHAT and WHY
+
+    Test failure philosophy:
+    - Failing test + good implementation = bug found, fix implementation
+    - Failing test + bad test config = fix test config (imports, mocks, setup)
+    - Failing test + test tests wrong thing = escalate for spec clarification
+
+  prTypeIdentification: |
+    How to know which rules apply:
+
+    IMPLEMENTATION PR indicators:
+    - PR title includes: "Implementation", "Feature", "Add", "Create", "Refactor"
+    - estimated_files lists: src/*, lib/*, components/*, services/*
+    - PR description focuses on functionality and requirements
+    - Dependencies are feature PRs, not test PRs
+    - NOT in tests/ directory
+
+    TEST PR indicators:
+    - PR title includes: "Tests", "Test Coverage", "Unit Tests", "Integration Tests"
+    - estimated_files lists: tests/*, __tests__/*, *.test.ts, *.spec.ts
+    - PR description mentions coverage, test cases, edge cases
+    - Dependencies include the implementation PR being tested
+    - Complexity score accounts for thoroughness, not just file count
+
+  whyThisMatters: |
+    Traditional approaches fail because:
+    - Developers write tests to pass, not to find bugs
+    - Tests become documentation of bugs rather than specification
+    - Confirmation bias: "my code works, so tests should pass"
+    - Tests get watered down to reduce "noise" from failures
+
+    Adversarial approach succeeds because:
+    - Test author has no ego investment in implementation passing
+    - Test author actively tries to break the code
+    - Implementation failures are discoveries, not personal failures
+    - Leads to robust, battle-tested code
+
 # Emergency Procedures
 # Coordinated halt and graceful shutdown
 emergency:
