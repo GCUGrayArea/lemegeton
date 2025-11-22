@@ -10,7 +10,7 @@ import * as path from 'path';
 import { spawn, ChildProcess } from 'child_process';
 import { RedisClient } from '../redis/client';
 import { Hub } from '../hub';
-import { AgentInfo } from '../hub/agentRegistry';
+import { AgentInfo, AgentType } from '../hub/agentRegistry';
 import { CoordinationMode } from '../core/coordinationMode';
 import {
   HubNotRunningError,
@@ -19,6 +19,7 @@ import {
   ShutdownTimeoutError
 } from './errors';
 import { HubStatus, TaskProgress, WorkResult } from './formatters';
+import { PRNode, ColdState } from '../types/pr';
 
 /**
  * Hub start options
@@ -43,6 +44,7 @@ export interface HubStopOptions {
  */
 export interface RunOptions {
   watch?: boolean;
+  assignOnly?: boolean;
   agent?: string;
   model?: string;
   budget?: number;
@@ -257,29 +259,13 @@ export class HubClient {
   async runPR(prId: string, options: RunOptions = {}): Promise<WorkResult> {
     const pid = await this.findDaemonPid();
 
-    if (!pid) {
-      throw new HubNotRunningError();
+    if (pid) {
+      // Daemon mode: Hub is running, use messaging (TODO: Phase 1B)
+      throw new Error('Daemon mode not yet implemented. Please run without Hub daemon for testing.');
+    } else {
+      // In-process mode: No daemon, run Hub in current process
+      return this.runInProcess(prId, options);
     }
-
-    // TODO: Implement work execution via message bus (PR-013)
-    // For now, just return a stub
-    console.log(`[HubClient] Running PR ${prId}...`);
-
-    if (options.dryRun) {
-      return {
-        prId,
-        success: true,
-        duration: 0
-      };
-    }
-
-    // Stub implementation
-    return {
-      prId,
-      success: true,
-      duration: 0,
-      error: 'Work execution not yet implemented'
-    };
   }
 
   /**
@@ -288,15 +274,190 @@ export class HubClient {
   async runAll(options: RunOptions = {}): Promise<WorkResult[]> {
     const pid = await this.findDaemonPid();
 
-    if (!pid) {
-      throw new HubNotRunningError();
+    if (pid) {
+      // Daemon mode: Hub is running, use messaging (TODO: Phase 1B)
+      throw new Error('Daemon mode not yet implemented. Please run without Hub daemon for testing.');
+    } else {
+      // In-process mode: No daemon, run Hub in current process
+      // TODO: Implement runAllInProcess
+      throw new Error('runAll in-process mode not yet implemented. Use runPR for single PR testing.');
     }
+  }
 
-    // TODO: Implement work execution via message bus (PR-013)
-    console.log('[HubClient] Running all available work...');
+  /**
+   * Run a PR in-process (no daemon)
+   */
+  private async runInProcess(prId: string, options: RunOptions): Promise<WorkResult> {
+    console.log(`[HubClient] Running PR ${prId} in-process mode...`);
 
-    // Stub implementation
-    return [];
+    const startTime = Date.now();
+    let hub: Hub | null = null;
+
+    try {
+      // Create Hub in foreground mode
+      hub = new Hub({
+        daemon: {
+          workDir: this.workDir,
+          pidFile: this.pidFile,
+          logFile: path.join(this.workDir, '.lemegeton', 'hub-inprocess.log'),
+        },
+        redis: {
+          autoSpawn: true,
+        },
+      });
+
+      // Start Hub
+      await hub.start();
+
+      // Get components
+      const scheduler = hub.getScheduler();
+      const processManager = hub.getProcessManager();
+      const redisClient = hub.getRedisClient();
+
+      if (!scheduler || !processManager || !redisClient) {
+        throw new Error('Hub components not initialized');
+      }
+
+      // Get PR from Redis state
+      const prNode = await this.getPRFromRedis(redisClient, prId);
+      if (!prNode) {
+        throw new Error(`PR not found: ${prId}`);
+      }
+
+      // Check if PR is in a workable state
+      if (!this.isPRWorkable(prNode)) {
+        throw new Error(`PR ${prId} is not in a workable state (current: ${prNode.state})`);
+      }
+
+      // Determine agent type needed for this PR
+      const agentType = this.getAgentTypeForPR(prNode);
+
+      console.log(`[HubClient] Spawning ${agentType} agent for ${prId}...`);
+
+      // Spawn agent
+      const agentId = await processManager.spawnAgent({
+        agentType,
+        workDir: this.workDir,
+      });
+
+      if (options.dryRun) {
+        console.log(`[HubClient] Dry run: Would assign ${prId} to ${agentId}`);
+        const duration = Date.now() - startTime;
+        return {
+          prId,
+          success: true,
+          duration,
+        };
+      }
+
+      console.log(`[HubClient] Spawned agent ${agentId}`);
+      console.log(`[HubClient] Assigning ${prId} to ${agentId}...`);
+
+      // For --assign-only mode, return after assignment
+      if (options.assignOnly) {
+        // Assign mode: just spawn and assign, don't wait
+        const duration = Date.now() - startTime;
+        return {
+          prId,
+          success: true,
+          duration,
+          message: `Assigned to agent ${agentId}`,
+        };
+      }
+
+      // TODO: Actually wait for agent to complete work
+      // For now, just return success after spawning
+      console.log(`[HubClient] Waiting for agent to complete (not yet implemented)...`);
+
+      const duration = Date.now() - startTime;
+      return {
+        prId,
+        success: true,
+        duration,
+        message: 'Agent spawned successfully. Full execution tracking not yet implemented.',
+      };
+
+    } catch (error) {
+      const duration = Date.now() - startTime;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.error(`[HubClient] Error running PR ${prId}:`, errorMessage);
+      return {
+        prId,
+        success: false,
+        duration,
+        error: errorMessage,
+      };
+    } finally {
+      // Clean up Hub
+      if (hub) {
+        console.log('[HubClient] Stopping Hub...');
+        await hub.stop();
+      }
+    }
+  }
+
+  /**
+   * Get PR data from Redis
+   */
+  private async getPRFromRedis(redisClient: RedisClient, prId: string): Promise<PRNode | null> {
+    try {
+      const client = redisClient.getClient();
+      const prsData = await client.get('state:prs');
+      if (!prsData) {
+        return null;
+      }
+
+      const prs = JSON.parse(prsData);
+      const prData = prs[prId];
+      if (!prData) {
+        return null;
+      }
+
+      // Convert to PRNode format
+      return {
+        id: prId,
+        title: prData.title || 'Unknown',
+        state: prData.cold_state,
+        dependencies: new Set(prData.dependencies || []),
+        dependents: new Set(), // Would need to compute from full PR list
+        files: new Set(prData.files || []),
+        priority: prData.priority || 'medium',
+        complexity: prData.complexity || 5,
+        estimatedMinutes: prData.estimatedMinutes || 60,
+        suggestedModel: prData.suggestedModel,
+      };
+    } catch (error) {
+      console.error(`[HubClient] Error fetching PR ${prId} from Redis:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * Check if PR is in a workable state
+   */
+  private isPRWorkable(pr: PRNode): boolean {
+    const workableStates: ColdState[] = ['new', 'ready', 'planned', 'in_progress', 'completed', 'broken'];
+    return workableStates.includes(pr.state);
+  }
+
+  /**
+   * Determine agent type needed for a PR
+   */
+  private getAgentTypeForPR(pr: PRNode): AgentType {
+    // Map PR state to agent type
+    switch (pr.state) {
+      case 'new':
+      case 'ready':
+        return 'planning';
+      case 'planned':
+      case 'in_progress':
+      case 'broken':
+        return 'worker';
+      case 'completed':
+        return 'qc';
+      default:
+        return 'worker';
+    }
   }
 
   /**

@@ -22,6 +22,10 @@ import { DaemonManager } from './daemon';
 import { StartupSequence } from './startup';
 import { ShutdownHandler } from './shutdown';
 import { AgentRegistry, AgentInfo } from './agentRegistry';
+import { MessageBus } from '../communication/messageBus';
+import { Scheduler } from '../scheduler';
+import { AgentSpawner } from './agentSpawner';
+import { ProcessManager } from './processManager';
 
 /**
  * Hub configuration
@@ -98,6 +102,10 @@ export class Hub extends EventEmitter {
   private startupSequence: StartupSequence | null = null;
   private shutdownHandler: ShutdownHandler;
   private agentRegistry: AgentRegistry;
+  private messageBus: MessageBus | null = null;
+  private scheduler: Scheduler | null = null;
+  private agentSpawner: AgentSpawner | null = null;
+  private processManager: ProcessManager | null = null;
   private isRunning: boolean = false;
   private shutdownPromise: Promise<void> | null = null;
   private heartbeatTimer: NodeJS.Timeout | null = null;
@@ -140,6 +148,15 @@ export class Hub extends EventEmitter {
 
       // Initialize lease manager
       await this.initializeLeaseManager();
+
+      // Initialize message bus
+      await this.initializeMessageBus();
+
+      // Initialize scheduler
+      await this.initializeScheduler();
+
+      // Initialize agent spawner and process manager
+      await this.initializeProcessManager();
 
       // Create startup sequence
       this.startupSequence = new StartupSequence(
@@ -310,6 +327,44 @@ export class Hub extends EventEmitter {
   }
 
   /**
+   * Initialize message bus
+   */
+  private async initializeMessageBus(): Promise<void> {
+    this.messageBus = new MessageBus(
+      this.redisClient!,
+      this.coordinationMode!
+    );
+    await this.messageBus.start();
+  }
+
+  /**
+   * Initialize scheduler
+   */
+  private async initializeScheduler(): Promise<void> {
+    this.scheduler = new Scheduler();
+    // Scheduler will be initialized with task list from startup sequence
+  }
+
+  /**
+   * Initialize agent spawner and process manager
+   */
+  private async initializeProcessManager(): Promise<void> {
+    this.agentSpawner = new AgentSpawner({
+      redisUrl: this.redisClient!.getClient() ? this.config.redis.url : undefined,
+      workDir: this.config.daemon.workDir,
+    });
+
+    this.processManager = new ProcessManager(
+      this.agentSpawner,
+      this.agentRegistry,
+      {
+        maxAgents: 10,
+        autoRestart: true,
+      }
+    );
+  }
+
+  /**
    * Start heartbeat monitoring
    */
   private startHeartbeatMonitoring(): void {
@@ -381,6 +436,16 @@ export class Hub extends EventEmitter {
    */
   private async cleanup(): Promise<void> {
     try {
+      // Stop process manager and agents
+      if (this.processManager) {
+        await this.processManager.shutdownAll();
+      }
+
+      // Stop message bus
+      if (this.messageBus) {
+        await this.messageBus.stop();
+      }
+
       // Stop lease manager (doesn't have a stop method, just cleanup heartbeats)
       if (this.leaseManager) {
         // LeaseManager will be garbage collected
@@ -527,6 +592,48 @@ export class Hub extends EventEmitter {
    */
   getCoordinationMode(): CoordinationMode | null {
     return this.coordinationMode?.getMode() || null;
+  }
+
+  /**
+   * Get message bus
+   */
+  getMessageBus(): MessageBus | null {
+    return this.messageBus;
+  }
+
+  /**
+   * Get scheduler
+   */
+  getScheduler(): Scheduler | null {
+    return this.scheduler;
+  }
+
+  /**
+   * Get agent spawner
+   */
+  getAgentSpawner(): AgentSpawner | null {
+    return this.agentSpawner;
+  }
+
+  /**
+   * Get process manager
+   */
+  getProcessManager(): ProcessManager | null {
+    return this.processManager;
+  }
+
+  /**
+   * Get state machine
+   */
+  getStateMachine(): StateMachine | null {
+    return this.stateMachine;
+  }
+
+  /**
+   * Get lease manager
+   */
+  getLeaseManager(): LeaseManager | null {
+    return this.leaseManager;
   }
 }
 

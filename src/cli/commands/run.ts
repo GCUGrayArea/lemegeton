@@ -18,6 +18,7 @@ export function createRunCommand(): Command {
     .description('Execute work')
     .argument('[pr-id]', 'Specific PR to run (e.g., PR-009)')
     .option('--watch', 'Watch mode - continuous execution')
+    .option('--assign-only', 'Assign work but do not wait for completion')
     .option('--agent <type>', 'Specific agent type to use')
     .option('--model <tier>', 'Force specific model tier (haiku|sonnet|opus)')
     .option('--budget <amount>', 'Cost budget limit', parseFloat)
