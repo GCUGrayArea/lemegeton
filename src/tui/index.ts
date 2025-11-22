@@ -25,6 +25,7 @@ import { RedisClient } from '../redis/client';
 import { TaskListParser } from '../parser/taskList';
 import { PRData } from '../parser/types';
 import { PRState } from '../types/pr';
+import { mergeConfig } from '../utils/config';
 
 /**
  * Default TUI configuration
@@ -66,7 +67,7 @@ export class TUIManager extends EventEmitter {
 
   constructor(config: TUIConfig = {}) {
     super();
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.config = mergeConfig(DEFAULT_CONFIG, config);
   }
 
   /**

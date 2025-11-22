@@ -4,6 +4,7 @@
 
 import { AgentState, AgentHeartbeat, HeartbeatAck } from './types';
 import { EventEmitter } from 'events';
+import { mergeConfig } from '../utils/config';
 
 export interface HeartbeatConfig {
   interval: number;        // Heartbeat interval in ms (default: 30000)
@@ -35,7 +36,7 @@ export class HeartbeatManager extends EventEmitter {
     config: Partial<HeartbeatConfig> = {}
   ) {
     super();
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.config = mergeConfig(DEFAULT_CONFIG, config);
   }
 
   /**

@@ -15,6 +15,7 @@ import {
   MessageBusConfig,
   DEFAULT_MESSAGE_BUS_CONFIG,
 } from './types';
+import { mergeConfig } from '../utils/config';
 
 /**
  * Redis pub/sub transport implementation
@@ -39,7 +40,7 @@ export class RedisPubSub extends EventEmitter implements IMessageTransport {
   constructor(redisClient: RedisClient, config: MessageBusConfig = {}) {
     super();
     this.redisClient = redisClient;
-    this.config = { ...DEFAULT_MESSAGE_BUS_CONFIG, ...config };
+    this.config = mergeConfig(DEFAULT_MESSAGE_BUS_CONFIG, config);
   }
 
   /**
