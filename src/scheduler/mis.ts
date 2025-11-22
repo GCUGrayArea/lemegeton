@@ -14,6 +14,8 @@ import {
 } from './types';
 import { DependencyGraph } from './dependencies';
 import { ConflictDetector } from './conflicts';
+import { SimpleCache } from '../utils/cache';
+import { mergeConfig } from '../utils/config';
 
 /**
  * Default scheduler configuration
@@ -34,17 +36,18 @@ export class MISScheduler {
   private config: Required<SchedulerConfig>;
   private dependencyGraph: DependencyGraph;
   private conflictDetector: ConflictDetector;
-  private resultCache: Map<string, SchedulerResult> = new Map();
-  private cacheTimestamps: Map<string, number> = new Map();
+  private resultCache: SimpleCache<string, SchedulerResult>;
 
   constructor(
     dependencyGraph: DependencyGraph,
     conflictDetector: ConflictDetector,
     config: SchedulerConfig = {}
   ) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.config = mergeConfig(DEFAULT_CONFIG, config);
     this.dependencyGraph = dependencyGraph;
     this.conflictDetector = conflictDetector;
+    // Initialize cache with TTL in ms (config.cacheTTL is in seconds)
+    this.resultCache = new SimpleCache({ ttl: this.config.cacheTTL * 1000 });
   }
 
   /**
@@ -69,7 +72,7 @@ export class MISScheduler {
     // Check cache if enabled
     if (this.config.enableCaching) {
       const cacheKey = this.getCacheKey(available);
-      const cached = this.getCachedResult(cacheKey);
+      const cached = this.resultCache.get(cacheKey);
       if (cached) {
         return cached;
       }
@@ -91,7 +94,7 @@ export class MISScheduler {
     // Cache result if enabled
     if (this.config.enableCaching) {
       const cacheKey = this.getCacheKey(available);
-      this.cacheResult(cacheKey, result);
+      this.resultCache.set(cacheKey, result);
     }
 
     return result;
@@ -307,53 +310,10 @@ export class MISScheduler {
   }
 
   /**
-   * Get cached result if valid
-   */
-  private getCachedResult(key: string): SchedulerResult | null {
-    const cached = this.resultCache.get(key);
-    if (!cached) return null;
-
-    const timestamp = this.cacheTimestamps.get(key);
-    if (!timestamp) return null;
-
-    // Check if cache is still valid
-    const age = (Date.now() - timestamp) / 1000;
-    if (age > this.config.cacheTTL) {
-      this.resultCache.delete(key);
-      this.cacheTimestamps.delete(key);
-      return null;
-    }
-
-    return cached;
-  }
-
-  /**
-   * Cache a result
-   */
-  private cacheResult(key: string, result: SchedulerResult): void {
-    this.resultCache.set(key, result);
-    this.cacheTimestamps.set(key, Date.now());
-
-    // Limit cache size
-    if (this.resultCache.size > 100) {
-      // Remove oldest entries
-      const entries = Array.from(this.cacheTimestamps.entries())
-        .sort((a, b) => a[1] - b[1]);
-
-      for (let i = 0; i < 50; i++) {
-        const [oldKey] = entries[i];
-        this.resultCache.delete(oldKey);
-        this.cacheTimestamps.delete(oldKey);
-      }
-    }
-  }
-
-  /**
    * Clear the cache
    */
   clearCache(): void {
     this.resultCache.clear();
-    this.cacheTimestamps.clear();
   }
 
   /**

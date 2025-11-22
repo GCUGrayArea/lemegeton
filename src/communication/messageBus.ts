@@ -22,6 +22,7 @@ import {
   MessageIdGenerator,
   DEFAULT_MESSAGE_BUS_CONFIG,
 } from './types';
+import { mergeConfig } from '../utils/config';
 
 /**
  * Message Bus implementation
@@ -57,7 +58,7 @@ export class MessageBus extends EventEmitter implements IMessageBus {
     super();
     this.modeManager = modeManager;
     this.mode = modeManager.getMode();
-    this.config = { ...DEFAULT_MESSAGE_BUS_CONFIG, ...config };
+    this.config = mergeConfig(DEFAULT_MESSAGE_BUS_CONFIG, config);
 
     // Initialize both transports
     if (redisClient) {

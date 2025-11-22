@@ -28,6 +28,7 @@ import { DaemonManager } from './daemon';
 import { StartupSequence } from './startup';
 import { ShutdownHandler } from './shutdown';
 import { AgentRegistry, AgentInfo } from './agentRegistry';
+import { mergeConfig } from '../utils/config';
 
 /**
  * Hub configuration
@@ -116,13 +117,7 @@ export class Hub extends EventEmitter {
 
   constructor(config: HubConfig = {}) {
     super();
-    this.config = {
-      ...DEFAULT_HUB_CONFIG,
-      redis: { ...DEFAULT_HUB_CONFIG.redis, ...config.redis },
-      daemon: { ...DEFAULT_HUB_CONFIG.daemon, ...config.daemon },
-      heartbeat: { ...DEFAULT_HUB_CONFIG.heartbeat, ...config.heartbeat },
-      shutdown: { ...DEFAULT_HUB_CONFIG.shutdown, ...config.shutdown },
-    };
+    this.config = mergeConfig(DEFAULT_HUB_CONFIG, config);
 
     this.daemonManager = new DaemonManager(this.config.daemon);
     this.shutdownHandler = new ShutdownHandler(this.config.shutdown);

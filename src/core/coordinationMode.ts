@@ -15,6 +15,7 @@ import { RedisHealthChecker, HealthStatus } from '../redis/health';
 import { DegradedModeHandler } from './degradedMode';
 import { IsolatedModeHandler } from './isolatedMode';
 import { CoordinationError, wrapError, ErrorCode } from '../types';
+import { mergeConfig } from '../utils/config';
 
 /**
  * Coordination modes
@@ -100,7 +101,7 @@ export class CoordinationModeManager extends EventEmitter {
     super();
     this.redisClient = redisClient;
     this.healthChecker = healthChecker;
-    this.config = { ...DEFAULT_COORDINATION_CONFIG, ...config };
+    this.config = mergeConfig(DEFAULT_COORDINATION_CONFIG, config);
     this.degradedHandler = new DegradedModeHandler(this.config);
     this.isolatedHandler = new IsolatedModeHandler(this.config);
 
