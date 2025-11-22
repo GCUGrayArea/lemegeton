@@ -32,7 +32,17 @@ export class CommunicationManager extends EventEmitter {
   async publishToHub(message: AgentMessage): Promise<void> {
     const channel = 'hub:messages';
     try {
-      await this.publishFn(channel, message);
+      // Wrap AgentMessage in Message format for MessageBus
+      const wrappedMessage = {
+        id: `msg-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+        timestamp: Date.now(),
+        type: message.type as any, // AgentMessage.type maps to MessageType
+        from: this.agentId,
+        to: 'hub',
+        payload: message,
+      };
+
+      await this.publishFn(channel, wrappedMessage);
       this.emit('messageSent', message);
     } catch (error) {
       this.emit('error', { type: 'publish', error, message });
@@ -46,8 +56,11 @@ export class CommunicationManager extends EventEmitter {
   async subscribeToAssignments(handler: AssignmentHandler): Promise<void> {
     const channel = `agent:${this.agentId}:assignments`;
     const wrappedHandler: MessageHandler = async (message: any) => {
-      if (this.isValidAssignment(message)) {
-        await handler(message as Assignment);
+      // Extract payload from Message wrapper if present
+      const assignment = message.payload || message;
+
+      if (this.isValidAssignment(assignment)) {
+        await handler(assignment as Assignment);
       }
     };
 

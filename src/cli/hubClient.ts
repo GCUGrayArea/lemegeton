@@ -531,16 +531,19 @@ export class HubClient {
 
     const completionPromise = new Promise<WorkResult | null>((resolve) => {
       const handler = (message: any) => {
-        if (message.type === 'complete' && message.agentId === agentId) {
+        // Extract payload from Message wrapper if present
+        const agentMessage = message.payload || message;
+
+        if (agentMessage.type === 'complete' && agentMessage.agentId === agentId) {
           console.log(`[HubClient] Received completion from ${agentId}`);
-          completionResult = message.result;
-          resolve(message.result);
-        } else if (message.type === 'failed' && message.agentId === agentId) {
+          completionResult = agentMessage.result;
+          resolve(agentMessage.result);
+        } else if (agentMessage.type === 'failed' && agentMessage.agentId === agentId) {
           console.log(`[HubClient] Received failure from ${agentId}`);
           resolve({
             prId: prNode.id,
             success: false,
-            error: message.error?.message || 'Agent failed',
+            error: agentMessage.error?.message || 'Agent failed',
           });
         }
       };
