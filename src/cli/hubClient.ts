@@ -488,18 +488,27 @@ export class HubClient {
       throw new Error('MessageBus not initialized');
     }
 
+    const { MessageType } = await import('../communication/types');
+
     const assignmentChannel = `agent:${agentId}:assignments`;
-    const assignment = {
-      prId: prNode.id,
-      assignedAt: Date.now(),
-      priority: prNode.priority,
-      complexity: prNode.complexity,
-      estimatedDuration: prNode.estimatedMinutes,
-      files: Array.from(prNode.files),
+    const message = {
+      id: `msg-${Date.now()}-${Math.random().toString(36).substring(7)}`,
+      timestamp: Date.now(),
+      type: MessageType.ASSIGNMENT,
+      from: 'hub',
+      to: agentId,
+      payload: {
+        prId: prNode.id,
+        assignedAt: Date.now(),
+        priority: prNode.priority,
+        complexity: prNode.complexity,
+        estimatedDuration: prNode.estimatedMinutes,
+        files: Array.from(prNode.files),
+      },
     };
 
     console.log(`[HubClient] Publishing assignment to channel: ${assignmentChannel}`);
-    await messageBus.publish(assignmentChannel, assignment);
+    await messageBus.publish(assignmentChannel, message);
   }
 
   /**
