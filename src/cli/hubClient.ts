@@ -20,7 +20,7 @@ import {
 } from './errors';
 import { HubStatus, TaskProgress, WorkResult } from './formatters';
 import { ColdState } from '../types/pr';
-import { PRNode } from '../scheduler/types';
+import { PRNode, Priority } from '../scheduler/types';
 
 /**
  * Hub start options
@@ -356,7 +356,12 @@ export class HubClient {
 
       // For --assign-only mode, return after assignment
       if (options.assignOnly) {
-        // Assign mode: just spawn and assign, don't wait
+        // Give agent time to subscribe to its channel
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
+        // Send assignment to agent
+        await this.sendAssignment(hub, agentId, prNode);
+
         const duration = Date.now() - startTime;
         return {
           prId,
@@ -366,17 +371,31 @@ export class HubClient {
         };
       }
 
-      // TODO: Actually wait for agent to complete work
-      // For now, just return success after spawning
-      console.log(`[HubClient] Waiting for agent to complete (not yet implemented)...`);
+      // Give agent time to start and subscribe to its channel
+      console.log(`[HubClient] Waiting for agent to initialize...`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Send assignment and wait for completion
+      console.log(`[HubClient] Sending assignment to ${agentId}...`);
+      const result = await this.sendAssignmentAndWait(hub, agentId, prNode, 120000);
 
       const duration = Date.now() - startTime;
-      return {
-        prId,
-        success: true,
-        duration,
-        output: 'Agent spawned successfully. Full execution tracking not yet implemented.',
-      };
+      if (result) {
+        return {
+          prId,
+          success: result.success,
+          duration,
+          output: result.output,
+          error: result.error,
+        };
+      } else {
+        return {
+          prId,
+          success: false,
+          duration,
+          error: 'Agent did not respond with completion',
+        };
+      }
 
     } catch (error) {
       const duration = Date.now() - startTime;
@@ -458,6 +477,80 @@ export class HubClient {
       default:
         return 'worker';
     }
+  }
+
+  /**
+   * Send assignment to agent
+   */
+  private async sendAssignment(hub: Hub, agentId: string, prNode: PRNode): Promise<void> {
+    const messageBus = hub.getMessageBus();
+    if (!messageBus) {
+      throw new Error('MessageBus not initialized');
+    }
+
+    const assignmentChannel = `agent:${agentId}:assignments`;
+    const assignment = {
+      prId: prNode.id,
+      assignedAt: Date.now(),
+      priority: prNode.priority,
+      complexity: prNode.complexity,
+      estimatedDuration: prNode.estimatedMinutes,
+      files: Array.from(prNode.files),
+    };
+
+    console.log(`[HubClient] Publishing assignment to channel: ${assignmentChannel}`);
+    await messageBus.publish(assignmentChannel, assignment);
+  }
+
+  /**
+   * Send assignment and wait for completion
+   */
+  private async sendAssignmentAndWait(
+    hub: Hub,
+    agentId: string,
+    prNode: PRNode,
+    timeoutMs: number
+  ): Promise<WorkResult | null> {
+    const messageBus = hub.getMessageBus();
+    if (!messageBus) {
+      throw new Error('MessageBus not initialized');
+    }
+
+    // Subscribe to completion messages from Hub
+    const hubChannel = 'hub:messages';
+    let completionResult: WorkResult | null = null;
+
+    const completionPromise = new Promise<WorkResult | null>((resolve) => {
+      const handler = (message: any) => {
+        if (message.type === 'complete' && message.agentId === agentId) {
+          console.log(`[HubClient] Received completion from ${agentId}`);
+          completionResult = message.result;
+          resolve(message.result);
+        } else if (message.type === 'failed' && message.agentId === agentId) {
+          console.log(`[HubClient] Received failure from ${agentId}`);
+          resolve({
+            prId: prNode.id,
+            success: false,
+            error: message.error?.message || 'Agent failed',
+          });
+        }
+      };
+
+      messageBus.subscribe(hubChannel, handler);
+    });
+
+    // Send assignment
+    await this.sendAssignment(hub, agentId, prNode);
+
+    // Wait for completion or timeout
+    const timeoutPromise = new Promise<WorkResult | null>((resolve) => {
+      setTimeout(() => {
+        console.log(`[HubClient] Timeout waiting for agent ${agentId}`);
+        resolve(null);
+      }, timeoutMs);
+    });
+
+    return Promise.race([completionPromise, timeoutPromise]);
   }
 
   /**

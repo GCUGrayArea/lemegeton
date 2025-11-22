@@ -261,20 +261,39 @@ export abstract class BaseAgent extends EventEmitter {
    * Initialize communication (stub for PR-013)
    */
   private async initializeCommunication(): Promise<void> {
-    // Stub implementation - will be replaced in PR-013 with Redis pub/sub
-    // For testing, we can skip creating the communication manager
-    // and use direct event emission via sendToHub
+    // Connect to MessageBus for real agent communication
     if (process.env.NODE_ENV === 'test' || !this.config.redisUrl) {
       // Leave this.communication as null for testing
       this.communication = null;
     } else {
+      // Import MessageBus dynamically to avoid circular dependencies
+      const { MessageBus } = await import('../communication/messageBus');
+      const { RedisClient } = await import('../redis/client');
+      const { CoordinationModeManager } = await import('../core/coordinationMode');
+      const { RedisHealthChecker } = await import('../redis/health');
+
+      // Create Redis client for agent
+      const redisClient = new RedisClient(this.config.redisUrl);
+      await redisClient.connect();
+
+      // Create coordination mode manager
+      const healthChecker = new RedisHealthChecker(redisClient);
+      healthChecker.start();
+      const modeManager = new CoordinationModeManager(redisClient, healthChecker);
+      await modeManager.start();
+
+      // Create message bus
+      const messageBus = new MessageBus(redisClient, modeManager);
+      await messageBus.start();
+
+      // Create communication manager with real MessageBus
       this.communication = new CommunicationManager(
         this.agentId,
         async (channel: string, message: any) => {
-          this.emit('publish', { channel, message });
+          await messageBus.publish(channel, message);
         },
         async (channel: string, handler: MessageHandler) => {
-          this.emit('subscribe', { channel });
+          await messageBus.subscribe(channel, handler);
         }
       );
     }
