@@ -9,7 +9,7 @@
  * the Hub or agents, not here.
  */
 
-import { HotState, ColdState, PRState, PRTransition } from '../types/pr';
+import { HotState, ColdState, PRState, PRTransition, isColdState } from '../types';
 import {
   isValidTransition,
   validateTransition,
@@ -209,16 +209,26 @@ export class StateMachine {
     }
 
     // Trigger git commit if needed
-    // Note: needsCommit is only true when toState is a cold state
     if (needsCommit && this.gitCommitter) {
+      // Verify toState is actually a cold state (type-safe runtime check)
+      if (!isColdState(toState)) {
+        console.error(`[StateMachine] needsCommit is true but toState is not cold: ${toState}`);
+        return {
+          success: false,
+          new_state: fromState,
+          error: `Invalid state: needsCommit requires cold state, got ${toState}`,
+          committed: false,
+          transition
+        };
+      }
+
       try {
-        // Type assertion is safe because needsCommit guarantees toState is cold
-        const coldToState = toState as ColdState;
-        const commitMessage = this.generateCommitMessage(prId, fromState, coldToState, reason);
+        // TypeScript now knows toState is ColdState
+        const commitMessage = this.generateCommitMessage(prId, fromState, toState, reason);
         const metadata: CommitMetadata = {
           pr_id: prId,
           from_state: fromState,
-          to_state: coldToState,
+          to_state: toState,
           timestamp,
           agent_id: agentId,
           reason

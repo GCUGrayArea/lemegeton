@@ -19,11 +19,13 @@ import {
   ErrorInfo,
   ErrorCategory,
   MessageHandler,
+  AgentStats,
 } from './types';
 import { LifecycleManager } from './lifecycle';
 import { HeartbeatManager, HeartbeatConfig } from './heartbeat';
 import { CommunicationManager } from './communication';
 import { RecoveryManager } from './recovery';
+import { isNodeError, getErrorCode } from '../types';
 
 export interface AgentConfig {
   agentType: string;
@@ -245,7 +247,7 @@ export abstract class BaseAgent extends EventEmitter {
   /**
    * Get agent statistics
    */
-  getStats(): any {
+  getStats(): AgentStats {
     return {
       agentId: this.agentId,
       agentType: this.agentType,
@@ -325,7 +327,7 @@ export abstract class BaseAgent extends EventEmitter {
     const errorInfo: ErrorInfo = {
       message: error.message,
       stack: error.stack,
-      code: (error as any).code,
+      code: getErrorCode(error),
       category,
     };
 
@@ -384,8 +386,9 @@ export abstract class BaseAgent extends EventEmitter {
    */
   protected categorizeError(error: Error): ErrorCategory {
     // Network errors are transient
-    if ((error as any).code === 'ECONNREFUSED' ||
-        (error as any).code === 'ETIMEDOUT' ||
+    const errorCode = getErrorCode(error);
+    if (errorCode === 'ECONNREFUSED' ||
+        errorCode === 'ETIMEDOUT' ||
         error.message.includes('network')) {
       return ErrorCategory.TRANSIENT;
     }

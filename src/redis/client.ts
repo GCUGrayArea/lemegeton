@@ -124,7 +124,14 @@ export class RedisClient extends EventEmitter {
    */
   private createRedisClient(): LemegetonRedisClient {
     const config = getConfig();
-    const retryConfig = config.redis.retry;
+
+    // Resolve retry configuration with defaults
+    const retryConfig = {
+      maxAttempts: config.redis.retry?.maxAttempts ?? 10,
+      initialDelay: config.redis.retry?.initialDelay ?? 1000,
+      maxDelay: config.redis.retry?.maxDelay ?? 30000,
+      factor: config.redis.retry?.factor ?? 2,
+    };
 
     const client = createClient({
       url: this.url,
@@ -137,7 +144,7 @@ export class RedisClient extends EventEmitter {
           }
 
           // Check max attempts
-          if (retries >= retryConfig!.maxAttempts!) {
+          if (retries >= retryConfig.maxAttempts) {
             this.setState(RedisConnectionState.ERROR);
             this.emit('error', new Error(`Failed to connect after ${retries} attempts`));
             return false;
@@ -145,8 +152,8 @@ export class RedisClient extends EventEmitter {
 
           // Calculate delay with exponential backoff
           const delay = Math.min(
-            retryConfig!.initialDelay! * Math.pow(retryConfig!.factor!, retries),
-            retryConfig!.maxDelay!
+            retryConfig.initialDelay * Math.pow(retryConfig.factor, retries),
+            retryConfig.maxDelay
           );
 
           this.reconnectAttempt = retries + 1;

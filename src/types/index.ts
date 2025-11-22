@@ -128,6 +128,27 @@ export {
 } from './prompts';
 
 // ============================================================================
+// Type Guards
+// ============================================================================
+
+export {
+  isHotState,
+  isColdState,
+  isValidState,
+  assertColdState,
+  assertHotState,
+  isCoordinationMode,
+  isNodeError,
+  hasStack,
+  getErrorMessage,
+  getErrorCode
+} from './guards';
+
+export type {
+  NodeError
+} from './guards';
+
+// ============================================================================
 // Version
 // ============================================================================
 

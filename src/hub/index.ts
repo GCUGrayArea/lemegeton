@@ -14,7 +14,13 @@ import { EventEmitter } from 'events';
 import { RedisClient, RedisConnectionState } from '../redis/client';
 import { RedisAutoSpawner } from '../redis/autoSpawn';
 import { CoordinationModeManager, CoordinationMode } from '../core/coordinationMode';
-import { StateMachine } from '../core/stateMachine';
+import {
+  StateMachine,
+  IGitCommitter,
+  IStateEventEmitter,
+  CommitMetadata,
+  StateTransitionEvent
+} from '../core/stateMachine';
 import { LeaseManager } from '../core/leaseManager';
 import { RedisHealthChecker } from '../redis/health';
 import { loadConfig, LemegetonConfig } from '../config';
@@ -283,8 +289,8 @@ export class Hub extends EventEmitter {
    */
   private async initializeStateMachine(): Promise<void> {
     // Create git committer (simplified for now)
-    const gitCommitter = {
-      commit: async (message: string, metadata: any) => {
+    const gitCommitter: IGitCommitter = {
+      commit: async (message: string, metadata: CommitMetadata): Promise<void> => {
         console.log(`[Hub] Would commit: ${message}`);
         console.log(`[Hub] Metadata:`, metadata);
         // TODO: Implement actual git operations in PR-010
@@ -292,9 +298,9 @@ export class Hub extends EventEmitter {
     };
 
     // Create state event emitter (uses hub's event emitter)
-    const stateEventEmitter = {
-      emit: (event: string, ...args: any[]) => {
-        this.emit(event, ...args);
+    const stateEventEmitter: IStateEventEmitter = {
+      emit: (event: 'state_transition', data: StateTransitionEvent): void => {
+        this.emit(event, data);
       }
     };
 

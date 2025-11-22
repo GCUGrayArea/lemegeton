@@ -435,18 +435,20 @@ export class MessageBus extends EventEmitter implements IMessageBus {
    * Setup event listeners for a transport
    */
   private setupTransportEventListeners(transport: IMessageTransport, type: string): void {
-    // Transport implementations extend EventEmitter
-    const emitter = transport as any as EventEmitter;
+    // Transport implementations extend EventEmitter - verify at runtime
+    if (!(transport instanceof EventEmitter)) {
+      throw new Error(`Transport ${type} must extend EventEmitter`);
+    }
 
-    emitter.on('error', (error: any) => {
+    transport.on('error', (error: Error) => {
       this.emit('transportError', { type, error });
     });
 
-    emitter.on('published', (event: any) => {
+    transport.on('published', (event: Record<string, unknown>) => {
       this.emit('transportPublished', { type, ...event });
     });
 
-    emitter.on('received', (event: any) => {
+    transport.on('received', (event: Record<string, unknown>) => {
       this.emit('transportReceived', { type, ...event });
     });
   }
@@ -478,16 +480,16 @@ export class MessageBus extends EventEmitter implements IMessageBus {
   /**
    * Create a message with default values
    */
-  static createMessage(
+  static createMessage<T = unknown>(
     type: string,
     from: string,
-    payload: any,
+    payload: T,
     options: Partial<Message> = {}
   ): Message {
     return {
       id: MessageIdGenerator.generate(),
       timestamp: Date.now(),
-      type: type as any,
+      type: type as Message['type'],
       from,
       payload,
       ...options,
