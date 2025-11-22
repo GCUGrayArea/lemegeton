@@ -10,6 +10,10 @@
   min-height: 0;
 }
 
+.dependency-graph-flow.collapsed {
+  flex: 0 0 auto;
+}
+
 .dependency-graph-flow h2 {
   margin: 0 0 15px 0;
   font-size: 1.2em;

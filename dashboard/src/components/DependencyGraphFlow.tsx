@@ -292,7 +292,7 @@ function DependencyGraphFlowInner({
   }
 
   return (
-    <div className="dependency-graph-flow">
+    <div className={`dependency-graph-flow ${isCollapsed ? 'collapsed' : ''}`}>
       <h2 onClick={() => setIsCollapsed(!isCollapsed)} className="collapsible-header">
         <span className={`chevron ${isCollapsed ? 'collapsed' : ''}`}>▼</span>
         Dependency Graph
