@@ -83,6 +83,13 @@ export class StartupSequence {
   }
 
   /**
+   * Get the parsed task list
+   */
+  getTaskList(): TaskList | null {
+    return this.taskList;
+  }
+
+  /**
    * Parse task-list.md
    */
   private async parseTaskList(): Promise<void> {

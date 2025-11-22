@@ -167,6 +167,13 @@ export class Hub extends EventEmitter {
       // Parse task list and hydrate state
       await this.startupSequence.hydrateFromGit();
 
+      // Initialize scheduler with task list
+      const taskList = this.startupSequence.getTaskList();
+      if (taskList && this.scheduler) {
+        await this.scheduler.initialize(taskList);
+        console.log('[Hub] Scheduler initialized with task list');
+      }
+
       // Initialize agent registry
       await this.agentRegistry.initialize(this.redisClient!);
 
