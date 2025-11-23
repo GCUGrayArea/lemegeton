@@ -19,6 +19,11 @@ import { MCPCache } from './cache';
 import { RetryManager } from './utils/retry';
 
 /**
+ * Maximum number of consecutive failures before marking server as unavailable
+ */
+const MAX_CONSECUTIVE_FAILURES = 3;
+
+/**
  * MCP Client operation mode
  */
 export type MCPClientMode = 'production' | 'stub';
@@ -469,8 +474,8 @@ export class MCPClient extends EventEmitter {
       health.lastFailure = Date.now();
       health.failureCount++;
 
-      // Mark unavailable after 3 consecutive failures
-      if (health.failureCount >= 3) {
+      // Mark unavailable after consecutive failures
+      if (health.failureCount >= MAX_CONSECUTIVE_FAILURES) {
         health.available = false;
         this.emit('serverUnavailable', serverName);
       }

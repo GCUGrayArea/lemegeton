@@ -18,6 +18,12 @@ const VALID_TRANSITIONS: Map<AgentState, AgentState[]> = new Map([
   [AgentState.STOPPED, []],
 ]);
 
+/**
+ * Maximum number of state transitions to keep in history
+ * Prevents unbounded memory growth for long-running agents
+ */
+const MAX_STATE_HISTORY = 100;
+
 export class LifecycleManager extends EventEmitter {
   private currentState: AgentState = AgentState.INITIALIZING;
   private stateHistory: Array<{ state: AgentState; timestamp: number }> = [];
@@ -79,8 +85,8 @@ export class LifecycleManager extends EventEmitter {
       timestamp: Date.now(),
     });
 
-    // Keep only last 100 states
-    if (this.stateHistory.length > 100) {
+    // Keep only recent state transitions
+    if (this.stateHistory.length > MAX_STATE_HISTORY) {
       this.stateHistory.shift();
     }
   }

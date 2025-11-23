@@ -25,6 +25,12 @@ import {
 import { mergeConfig } from '../utils/config';
 
 /**
+ * Maximum number of latency samples to keep for statistics
+ * Prevents unbounded memory growth while maintaining recent performance data
+ */
+const MAX_LATENCY_SAMPLES = 1000;
+
+/**
  * Message Bus implementation
  */
 export class MessageBus extends EventEmitter implements IMessageBus {
@@ -193,14 +199,30 @@ export class MessageBus extends EventEmitter implements IMessageBus {
 
   /**
    * Unsubscribe from all channels
+   * Optimized to avoid repeated deletions and array allocation
    */
   async unsubscribeAll(): Promise<void> {
-    const channels = Array.from(this.subscriptions.keys());
-
-    for (const channel of channels) {
-      await this.unsubscribe(channel);
+    // Early exit if no subscriptions
+    if (this.subscriptions.size === 0) {
+      return;
     }
 
+    // Unsubscribe from active transport for all channels at once
+    const transport = this.getActiveTransport();
+    if (transport && transport.isConnected()) {
+      // Iterate directly over keys without allocating intermediate array
+      for (const channel of this.subscriptions.keys()) {
+        try {
+          await transport.unsubscribe(channel);
+          this.emit('unsubscribed', { channel });
+        } catch (error) {
+          // Continue unsubscribing even if one fails
+          console.error(`[MessageBus] Failed to unsubscribe from ${channel}:`, error);
+        }
+      }
+    }
+
+    // Clear all subscriptions at once
     this.subscriptions.clear();
   }
 
@@ -279,22 +301,35 @@ export class MessageBus extends EventEmitter implements IMessageBus {
   }
 
   /**
-   * Switch to new transport based on mode
+   * Determine if switching between modes requires transport change
+   * Returns true when switching to/from ISOLATED mode
    */
-  private async switchTransport(newMode: CoordinationMode): Promise<void> {
+  private modeRequiresSwitch(oldMode: CoordinationMode, newMode: CoordinationMode): boolean {
+    return (
+      (oldMode === CoordinationMode.ISOLATED && newMode !== CoordinationMode.ISOLATED) ||
+      (oldMode !== CoordinationMode.ISOLATED && newMode === CoordinationMode.ISOLATED)
+    );
+  }
+
+  /**
+   * Disconnect old transport if switching modes
+   */
+  private async disconnectOldTransport(newMode: CoordinationMode): Promise<void> {
     const oldTransport = this.getActiveTransport();
 
-    // Disconnect from old transport (if different)
     if (oldTransport && oldTransport.isConnected()) {
-      const oldMode = this.mode;
-      const needsSwitch =
-        (oldMode === CoordinationMode.ISOLATED && newMode !== CoordinationMode.ISOLATED) ||
-        (oldMode !== CoordinationMode.ISOLATED && newMode === CoordinationMode.ISOLATED);
-
-      if (needsSwitch) {
+      if (this.modeRequiresSwitch(this.mode, newMode)) {
         await oldTransport.disconnect();
       }
     }
+  }
+
+  /**
+   * Switch to new transport based on mode
+   */
+  private async switchTransport(newMode: CoordinationMode): Promise<void> {
+    // Disconnect from old transport if needed
+    await this.disconnectOldTransport(newMode);
 
     // Connect to new transport
     const newTransport = this.getTransportForMode(newMode);
@@ -462,8 +497,8 @@ export class MessageBus extends EventEmitter implements IMessageBus {
   private trackLatency(latency: number): void {
     this.stats.latencies.push(latency);
 
-    // Keep only recent latencies (last 1000)
-    if (this.stats.latencies.length > 1000) {
+    // Keep only recent latencies
+    if (this.stats.latencies.length > MAX_LATENCY_SAMPLES) {
       this.stats.latencies.shift();
     }
   }

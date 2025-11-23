@@ -5,6 +5,7 @@
  * without conflicts, respecting dependencies and priorities.
  */
 
+import { createHash } from 'crypto';
 import {
   PRNode,
   Priority,
@@ -303,10 +304,22 @@ export class MISScheduler {
 
   /**
    * Get cache key for a set of available PRs
+   * Uses hashing for efficiency with large PR counts
    */
   private getCacheKey(prs: PRNode[]): string {
+    // For small PR counts, simple string concatenation is fine
+    if (prs.length <= 10) {
+      const ids = prs.map(pr => pr.id).sort().join(',');
+      return `mis:${ids}`;
+    }
+
+    // For larger counts, use hash to avoid creating large cache keys
     const ids = prs.map(pr => pr.id).sort().join(',');
-    return `mis:${ids}`;
+    const hash = createHash('sha256')
+      .update(ids)
+      .digest('hex')
+      .slice(0, 16); // First 16 chars provides good distribution
+    return `mis:${hash}`;
   }
 
   /**

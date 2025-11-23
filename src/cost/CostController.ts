@@ -41,6 +41,20 @@ export interface CostStorage {
 }
 
 /**
+ * Limit check structure for budget validation
+ */
+interface LimitCheck {
+  /** The configured limit (undefined if not set) */
+  limit: number | undefined;
+  /** Current usage amount */
+  current: number;
+  /** Estimated amount to add */
+  estimated: number;
+  /** Description of what's being checked */
+  type: string;
+}
+
+/**
  * Main Cost Controller class
  */
 export class CostController {
@@ -98,6 +112,62 @@ export class CostController {
   }
 
   /**
+   * Create limit checks for budget validation
+   * Extracted for clarity and reusability
+   */
+  private async createLimitChecks(
+    limits: CostLimits,
+    estimatedTokens: number,
+    currentPRUsage: UsageMetrics,
+    hourlyUsage: UsageMetrics,
+    dailyUsage: UsageMetrics,
+    monthlyUsage: UsageMetrics
+  ): Promise<LimitCheck[]> {
+    const checks: LimitCheck[] = [
+      {
+        limit: limits.max_tokens_per_pr,
+        current: currentPRUsage.tokens,
+        estimated: estimatedTokens,
+        type: 'PR tokens',
+      },
+      {
+        limit: limits.max_tokens_per_hour,
+        current: hourlyUsage.tokens,
+        estimated: estimatedTokens,
+        type: 'hourly tokens',
+      },
+      {
+        limit: limits.max_api_calls_per_pr,
+        current: currentPRUsage.api_calls,
+        estimated: 1,
+        type: 'PR API calls',
+      },
+    ];
+
+    // Add cost limits if tracking costs
+    if (this.config.track_costs) {
+      const estimatedCost = this.adapter.calculateCost(estimatedTokens, 'sonnet');
+
+      checks.push(
+        {
+          limit: limits.max_cost_per_day,
+          current: dailyUsage.cost,
+          estimated: estimatedCost,
+          type: 'daily cost',
+        },
+        {
+          limit: limits.max_cost_per_month,
+          current: monthlyUsage.cost,
+          estimated: estimatedCost,
+          type: 'monthly cost',
+        }
+      );
+    }
+
+    return checks;
+  }
+
+  /**
    * Check if operation should proceed based on budget limits
    */
   async checkBudget(
@@ -120,52 +190,15 @@ export class CostController {
     const dailyUsage = await this.storage.getDailyUsage();
     const monthlyUsage = await this.storage.getMonthlyUsage();
 
-    // Check each limit type
-    const checks: Array<{
-      limit: number | undefined;
-      current: number;
-      estimated: number;
-      type: string;
-    }> = [
-      {
-        limit: limits.max_tokens_per_pr,
-        current: currentPRUsage.tokens,
-        estimated: estimatedTokens,
-        type: 'PR tokens',
-      },
-      {
-        limit: limits.max_tokens_per_hour,
-        current: hourlyUsage.tokens,
-        estimated: estimatedTokens,
-        type: 'hourly tokens',
-      },
-      {
-        limit: limits.max_api_calls_per_pr,
-        current: currentPRUsage.api_calls,
-        estimated: 1,
-        type: 'PR API calls',
-      },
-    ];
-
-    // Check cost limits (only if tracking costs)
-    if (this.config.track_costs) {
-      const estimatedCost = this.adapter.calculateCost(estimatedTokens, 'sonnet');
-
-      checks.push(
-        {
-          limit: limits.max_cost_per_day,
-          current: dailyUsage.cost,
-          estimated: estimatedCost,
-          type: 'daily cost',
-        },
-        {
-          limit: limits.max_cost_per_month,
-          current: monthlyUsage.cost,
-          estimated: estimatedCost,
-          type: 'monthly cost',
-        }
-      );
-    }
+    // Create all limit checks
+    const checks = await this.createLimitChecks(
+      limits,
+      estimatedTokens,
+      currentPRUsage,
+      hourlyUsage,
+      dailyUsage,
+      monthlyUsage
+    );
 
     // Find first exceeded limit
     for (const check of checks) {

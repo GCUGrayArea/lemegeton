@@ -21,6 +21,12 @@ export interface ComplexityFactors {
 }
 
 /**
+ * Description length threshold for considering a PR to have detailed requirements
+ * Longer descriptions typically indicate more complex requirements
+ */
+const LONG_DESCRIPTION_THRESHOLD = 500;
+
+/**
  * Complexity Scorer class
  * Scores PRs from 1-10 based on multiple factors
  */
@@ -102,12 +108,12 @@ export class ComplexityScorer {
 
   /**
    * Score based on description length
-   * Algorithm: +1 if description > 500 chars
+   * Algorithm: +1 if description exceeds threshold
    */
   private scoreDescription(pr: PRMetadata): number {
     const description = pr.description || '';
     // Detailed requirements suggest complexity
-    return description.length > 500 ? 1 : 0;
+    return description.length > LONG_DESCRIPTION_THRESHOLD ? 1 : 0;
   }
 
   /**

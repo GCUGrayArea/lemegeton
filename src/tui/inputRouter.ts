@@ -10,6 +10,12 @@ import { TUIComponent, InputCommand, ThemeColors } from './types';
 import { EventEmitter } from 'events';
 
 /**
+ * Maximum number of commands to keep in history
+ * Prevents unbounded memory growth for long-running sessions
+ */
+const MAX_COMMAND_HISTORY = 100;
+
+/**
  * Input Router Component
  */
 export class InputRouter extends EventEmitter implements TUIComponent {
@@ -142,7 +148,7 @@ export class InputRouter extends EventEmitter implements TUIComponent {
 
     // Add to history
     this.commandHistory.push(trimmed);
-    if (this.commandHistory.length > 100) {
+    if (this.commandHistory.length > MAX_COMMAND_HISTORY) {
       this.commandHistory.shift();
     }
     this.historyIndex = -1;
