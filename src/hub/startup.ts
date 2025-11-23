@@ -182,19 +182,34 @@ export class StartupSequence {
 
     const client = this.redis.getClient();
 
-    // Store PRs in Redis
+    // Read existing state from Redis first
+    const existingDataStr = await client.get('state:prs');
+    const existingData: Record<string, any> = existingDataStr
+      ? JSON.parse(existingDataStr)
+      : {};
+
+    // Merge task-list.md with existing Redis state
+    // Redis state takes precedence for cold_state (preserves runtime updates)
     const prData: Record<string, any> = {};
     for (const pr of this.taskList.prs) {
+      const existing = existingData[pr.id];
+
       prData[pr.id] = {
         id: pr.id,
         title: pr.title,
-        cold_state: pr.cold_state,
+        // Preserve existing state if present, otherwise use task-list state
+        cold_state: existing?.cold_state || pr.cold_state,
         priority: pr.priority,
         complexity: pr.complexity,
         dependencies: pr.dependencies,
         estimated_files: pr.estimated_files,
         actual_files: pr.actual_files,
       };
+
+      // Update taskList with actual state for scheduler initialization
+      if (existing?.cold_state && existing.cold_state !== pr.cold_state) {
+        pr.cold_state = existing.cold_state;
+      }
     }
 
     await client.set('state:prs', JSON.stringify(prData));
