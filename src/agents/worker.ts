@@ -43,10 +43,15 @@ export class WorkerAgent extends BaseAgent {
         throw new Error(`PR data not found for ${assignment.prId}`);
       }
 
-      // 3. Check for API key
+      // 3. Check for authentication (API key or OAuth token)
       const apiKey = process.env.ANTHROPIC_API_KEY;
-      if (!apiKey) {
-        throw new Error('ANTHROPIC_API_KEY not set. Cannot generate code.');
+      const oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+
+      if (!apiKey && !oauthToken) {
+        throw new Error(
+          'Authentication required: Set either ANTHROPIC_API_KEY or CLAUDE_CODE_OAUTH_TOKEN.\n' +
+          'For Claude Code users: export CLAUDE_CODE_OAUTH_TOKEN=$(claude setup-token)'
+        );
       }
 
       // 4. Generate implementation using Claude
@@ -57,7 +62,7 @@ export class WorkerAgent extends BaseAgent {
         timestamp: Date.now(),
       });
 
-      const implementation = await this.generateImplementation(prd, prData, apiKey);
+      const implementation = await this.generateImplementation(prd, prData, { apiKey, oauthToken });
 
       // 5. Write files
       await this.reportProgress({
@@ -190,9 +195,12 @@ export class WorkerAgent extends BaseAgent {
   private async generateImplementation(
     prd: string,
     prData: any,
-    apiKey: string
+    auth: { apiKey?: string; oauthToken?: string }
   ): Promise<{ files: Array<{ path: string; content: string; action: string }> }> {
-    const client = new AnthropicClient({ apiKey });
+    const client = new AnthropicClient({
+      apiKey: auth.apiKey,
+      oauthToken: auth.oauthToken,
+    });
 
     // Build prompt for Claude
     const systemPrompt = `You are an expert TypeScript developer implementing features for the Lemegeton agent orchestration system.

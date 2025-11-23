@@ -7,17 +7,25 @@
 import { LLMClient, LLMRequest, LLMResponse, LLMMessage } from './types';
 
 export interface AnthropicClientConfig {
-  apiKey: string;
+  apiKey?: string;
+  oauthToken?: string;
   baseURL?: string;
 }
 
 export class AnthropicClient implements LLMClient {
-  private apiKey: string;
+  private apiKey?: string;
+  private oauthToken?: string;
   private baseURL: string;
 
   constructor(config: AnthropicClientConfig) {
     this.apiKey = config.apiKey;
+    this.oauthToken = config.oauthToken;
     this.baseURL = config.baseURL || 'https://api.anthropic.com/v1';
+
+    // Must have either API key or OAuth token
+    if (!this.apiKey && !this.oauthToken) {
+      throw new Error('AnthropicClient requires either apiKey or oauthToken');
+    }
   }
 
   async generate(request: LLMRequest): Promise<LLMResponse> {
@@ -44,13 +52,21 @@ export class AnthropicClient implements LLMClient {
       body.stop_sequences = request.stopSequences;
     }
 
+    // Build headers based on auth type
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'anthropic-version': '2023-06-01',
+    };
+
+    if (this.apiKey) {
+      headers['x-api-key'] = this.apiKey;
+    } else if (this.oauthToken) {
+      headers['authorization'] = `Bearer ${this.oauthToken}`;
+    }
+
     const response = await fetch(`${this.baseURL}/messages`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': this.apiKey,
-        'anthropic-version': '2023-06-01',
-      },
+      headers,
       body: JSON.stringify(body),
     });
 

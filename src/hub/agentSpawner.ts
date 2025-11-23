@@ -138,7 +138,7 @@ export class AgentSpawner extends EventEmitter {
     config: AgentSpawnConfig,
     agentId: string
   ): NodeJS.ProcessEnv {
-    return {
+    const env = {
       ...process.env,
       ...config.env,
       AGENT_ID: agentId,
@@ -148,6 +148,22 @@ export class AgentSpawner extends EventEmitter {
       HEARTBEAT_TIMEOUT: String(config.heartbeatTimeout || 90000),
       NODE_ENV: process.env.NODE_ENV || 'production',
     };
+
+    // Log auth method being used (without exposing tokens)
+    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const oauthToken = process.env.CLAUDE_CODE_OAUTH_TOKEN;
+
+    if (apiKey) {
+      const redacted = apiKey.substring(0, 7) + '...';
+      console.log(`[AgentSpawner] Passing ANTHROPIC_API_KEY (${redacted}) to ${agentId}`);
+    } else if (oauthToken) {
+      const redacted = oauthToken.substring(0, 7) + '...';
+      console.log(`[AgentSpawner] Passing CLAUDE_CODE_OAUTH_TOKEN (${redacted}) to ${agentId}`);
+    } else {
+      console.log(`[AgentSpawner] WARNING: No auth credentials found for ${agentId}`);
+    }
+
+    return env;
   }
 
   /**
