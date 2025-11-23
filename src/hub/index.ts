@@ -74,6 +74,8 @@ export const DEFAULT_HUB_CONFIG: Required<HubConfig> = {
     timeout: 30000,  // 30 seconds
     graceful: true,
   },
+  clock: getSystemClock(),
+  processHandlers: getSystemProcessHandlers(),
 };
 
 /**

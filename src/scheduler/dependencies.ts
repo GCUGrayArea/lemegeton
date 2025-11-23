@@ -54,7 +54,7 @@ export class DependencyGraph {
     // First pass: create all nodes
     for (const pr of taskList.prs || []) {
       const node: PRNode = {
-        id: pr.id || pr.pr_id,
+        id: pr.pr_id,
         title: pr.title || '',
         state: pr.cold_state || 'new',
         dependencies: new Set(pr.dependencies || []),

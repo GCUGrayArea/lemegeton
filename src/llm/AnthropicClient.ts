@@ -84,7 +84,12 @@ export class AnthropicClient implements LLMClient {
       throw new Error(`Anthropic API error: ${response.status} ${error}`);
     }
 
-    const data: AnthropicAPIResponse = await response.json();
+    const data = await response.json() as AnthropicAPIResponse;
+
+    // Validate and convert stop_reason to expected type
+    const stopReason = (['end_turn', 'max_tokens', 'stop_sequence'] as const).includes(
+      data.stop_reason as 'end_turn' | 'max_tokens' | 'stop_sequence'
+    ) ? data.stop_reason as 'end_turn' | 'max_tokens' | 'stop_sequence' : undefined;
 
     return {
       content: data.content[0].text,
@@ -94,7 +99,7 @@ export class AnthropicClient implements LLMClient {
         outputTokens: data.usage.output_tokens,
         totalTokens: data.usage.input_tokens + data.usage.output_tokens,
       },
-      stopReason: data.stop_reason,
+      stopReason,
     };
   }
 }

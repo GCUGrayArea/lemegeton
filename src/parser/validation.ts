@@ -69,8 +69,8 @@ export function validatePR(data: unknown, allPRIds?: Set<string>): ValidationRes
   }
 
   // Cold state validation
-  if (record.cold_state !== undefined) {
-    if (!VALID_COLD_STATES.includes(record.cold_state as string)) {
+  if (record.cold_state !== undefined && record.cold_state !== null) {
+    if (typeof record.cold_state !== 'string' || !VALID_COLD_STATES.includes(record.cold_state as ColdState)) {
       errors.push(
         `Invalid cold_state "${record.cold_state}". ` +
         `Must be one of: ${VALID_COLD_STATES.join(', ')}`
@@ -79,8 +79,8 @@ export function validatePR(data: unknown, allPRIds?: Set<string>): ValidationRes
   }
 
   // Priority validation
-  if (record.priority !== undefined) {
-    if (!VALID_PRIORITIES.includes(record.priority)) {
+  if (record.priority !== undefined && record.priority !== null) {
+    if (typeof record.priority !== 'string' || !VALID_PRIORITIES.includes(record.priority as Priority)) {
       errors.push(
         `Invalid priority "${record.priority}". ` +
         `Must be one of: ${VALID_PRIORITIES.join(', ')}`
@@ -89,32 +89,35 @@ export function validatePR(data: unknown, allPRIds?: Set<string>): ValidationRes
   }
 
   // Complexity validation
-  if (record.complexity !== undefined) {
+  if (record.complexity !== undefined && record.complexity !== null) {
     if (typeof record.complexity !== 'object') {
       errors.push('complexity must be an object');
     } else {
-      if (typeof record.complexity.score !== 'number') {
+      // Cast to record for property access
+      const complexity = record.complexity as Record<string, unknown>;
+
+      if (typeof complexity.score !== 'number') {
         errors.push('complexity.score must be a number');
-      } else if (record.complexity.score < 1 || record.complexity.score > 10) {
+      } else if (complexity.score < 1 || complexity.score > 10) {
         errors.push('complexity.score must be between 1 and 10');
       }
 
-      if (typeof record.complexity.estimated_minutes !== 'number') {
+      if (typeof complexity.estimated_minutes !== 'number') {
         errors.push('complexity.estimated_minutes must be a number');
-      } else if (record.complexity.estimated_minutes < 1 || record.complexity.estimated_minutes > 600) {
+      } else if (complexity.estimated_minutes < 1 || complexity.estimated_minutes > 600) {
         errors.push('complexity.estimated_minutes must be between 1 and 600');
       }
 
-      if (record.complexity.suggested_model !== undefined) {
-        if (!VALID_MODELS.includes(record.complexity.suggested_model)) {
+      if (complexity.suggested_model !== undefined) {
+        if (typeof complexity.suggested_model !== 'string' || !VALID_MODELS.includes(complexity.suggested_model)) {
           errors.push(
-            `Invalid complexity.suggested_model "${record.complexity.suggested_model}". ` +
+            `Invalid complexity.suggested_model "${complexity.suggested_model}". ` +
             `Must be one of: ${VALID_MODELS.join(', ')}`
           );
         }
       }
 
-      if (typeof record.complexity.rationale !== 'string') {
+      if (typeof complexity.rationale !== 'string') {
         errors.push('complexity.rationale must be a string');
       }
     }
@@ -141,17 +144,20 @@ export function validatePR(data: unknown, allPRIds?: Set<string>): ValidationRes
       errors.push('estimated_files must be an array');
     } else {
       for (let i = 0; i < record.estimated_files.length; i++) {
-        const file = record.estimated_files[i];
-        if (typeof file !== 'object') {
+        const fileEntry = record.estimated_files[i];
+        if (typeof fileEntry !== 'object' || fileEntry === null) {
           errors.push(`estimated_files[${i}] must be an object`);
           continue;
         }
+
+        // Cast to record for property access
+        const file = fileEntry as Record<string, unknown>;
 
         if (typeof file.path !== 'string') {
           errors.push(`estimated_files[${i}].path must be a string`);
         }
 
-        if (!['create', 'modify', 'delete'].includes(file.action)) {
+        if (typeof file.action !== 'string' || !['create', 'modify', 'delete'].includes(file.action)) {
           errors.push(
             `estimated_files[${i}].action must be one of: create, modify, delete`
           );
@@ -170,17 +176,20 @@ export function validatePR(data: unknown, allPRIds?: Set<string>): ValidationRes
       errors.push('actual_files must be an array');
     } else {
       for (let i = 0; i < record.actual_files.length; i++) {
-        const file = record.actual_files[i];
-        if (typeof file !== 'object') {
+        const fileEntry = record.actual_files[i];
+        if (typeof fileEntry !== 'object' || fileEntry === null) {
           errors.push(`actual_files[${i}] must be an object`);
           continue;
         }
+
+        // Cast to record for property access
+        const file = fileEntry as Record<string, unknown>;
 
         if (typeof file.path !== 'string') {
           errors.push(`actual_files[${i}].path must be a string`);
         }
 
-        if (!['create', 'modify', 'delete'].includes(file.action)) {
+        if (typeof file.action !== 'string' || !['create', 'modify', 'delete'].includes(file.action)) {
           errors.push(
             `actual_files[${i}].action must be one of: create, modify, delete`
           );

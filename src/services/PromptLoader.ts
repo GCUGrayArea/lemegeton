@@ -31,7 +31,7 @@ const PROMPT_KEY_PREFIX = 'prompt:';
  */
 interface RedisPromptCache {
   get(key: string): Promise<string | null>;
-  set(key: string, value: string): Promise<void>;
+  set(key: string, value: string): Promise<string | null>;
   exists(key: string): Promise<number>;
   del(keys: string[]): Promise<number>;
 }

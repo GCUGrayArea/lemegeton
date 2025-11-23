@@ -336,11 +336,23 @@ export class MISScheduler {
     const graphStats = this.dependencyGraph.getStats();
     const conflictStats = this.conflictDetector.getStats();
 
+    // Convert graph stats to SchedulerStats format
+    const schedulerStats: import('./types').SchedulerStats = {
+      totalPRs: graphStats.total,
+      availablePRs: graphStats.available,
+      inProgressPRs: graphStats.inProgress,
+      completedPRs: graphStats.completed,
+      avgSchedulingTimeMs: 0, // TODO: Track this metric in future PR
+      maxParallelism: this.config.maxParallelPRs,
+      currentParallelism: graphStats.inProgress,
+      schedulingDecisions: 0, // TODO: Track this metric in future PR
+    };
+
     return {
-      graph: graphStats,
+      graph: schedulerStats,
       conflicts: conflictStats,
       cache: {
-        size: this.resultCache.size,
+        size: this.resultCache.size(),
         enabled: this.config.enableCaching ?? false,
         ttl: this.config.cacheTTL ?? 300,
       },
