@@ -70,11 +70,28 @@ export class MCPClient extends EventEmitter {
           this.updateServerHealth(server.name, false);
           this.emit('serverConnectionFailed', server.name, error);
           // Don't throw - graceful degradation
+          throw error;
         }
       }
     );
 
-    await Promise.allSettled(connectionPromises);
+    const results = await Promise.allSettled(connectionPromises);
+
+    // Check connection results
+    const failures = results.filter(r => r.status === 'rejected');
+    if (failures.length === this.servers.size) {
+      // All servers failed
+      throw new Error('Failed to connect to all MCP servers');
+    }
+
+    if (failures.length > 0) {
+      // Some servers failed
+      this.emit('partialConnection', {
+        successful: results.length - failures.length,
+        failed: failures.length,
+      });
+    }
+
     this.connected = true;
     this.emit('connected');
   }

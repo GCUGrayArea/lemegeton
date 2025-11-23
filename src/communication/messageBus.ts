@@ -411,11 +411,11 @@ export class MessageBus extends EventEmitter implements IMessageBus {
   /**
    * Handle received message
    */
-  private handleReceivedMessage(
+  private async handleReceivedMessage(
     channel: string,
     message: Message,
     handler: MessageHandler
-  ): void {
+  ): Promise<void> {
     this.stats.totalReceived++;
     this.emit('received', { channel, message });
 
@@ -423,8 +423,10 @@ export class MessageBus extends EventEmitter implements IMessageBus {
     try {
       const result = handler(message);
       if (result instanceof Promise) {
-        result.catch((error) => {
+        await result.catch((error) => {
           this.emit('handlerError', { channel, message, error });
+          // Re-throw to ensure proper error propagation
+          throw error;
         });
       }
     } catch (error) {

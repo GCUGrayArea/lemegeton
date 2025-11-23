@@ -61,6 +61,7 @@ export class RedisClient extends EventEmitter {
   private reconnectAttempt = 0;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private isClosing = false;
+  private connectionPromise: Promise<void> | null = null;
 
   private readonly url: string;
   private readonly retryConfig: RequiredRetryConfig;
@@ -230,30 +231,24 @@ export class RedisClient extends EventEmitter {
       return;
     }
 
-    if (this.state === RedisConnectionState.CONNECTING) {
-      // Wait for ongoing connection
-      await new Promise<void>((resolve, reject) => {
-        const cleanup = () => {
-          this.off('connected', onConnected);
-          this.off('error', onError);
-        };
-
-        const onConnected = () => {
-          cleanup();
-          resolve();
-        };
-
-        const onError = (err: Error) => {
-          cleanup();
-          reject(err);
-        };
-
-        this.once('connected', onConnected);
-        this.once('error', onError);
-      });
-      return;
+    // Return existing connection attempt to avoid race conditions
+    if (this.connectionPromise) {
+      return this.connectionPromise;
     }
 
+    // Create new connection promise
+    this.connectionPromise = this.performConnect()
+      .finally(() => {
+        this.connectionPromise = null;
+      });
+
+    return this.connectionPromise;
+  }
+
+  /**
+   * Performs the actual connection
+   */
+  private async performConnect(): Promise<void> {
     this.isClosing = false;
     this.setState(RedisConnectionState.CONNECTING);
 
