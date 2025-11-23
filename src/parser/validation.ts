@@ -36,84 +36,96 @@ const VALID_MODELS = ['haiku', 'sonnet', 'opus'];
 
 /**
  * Validate a parsed PR data object
+ * Uses unknown type since we're validating untrusted input data
  */
-export function validatePR(data: any, allPRIds?: Set<string>): ValidationResult {
+export function validatePR(data: unknown, allPRIds?: Set<string>): ValidationResult {
   const errors: string[] = [];
+
+  // Type guard: ensure data is an object
+  if (typeof data !== 'object' || data === null) {
+    return {
+      valid: false,
+      errors: ['Data must be an object'],
+    };
+  }
+
+  // Cast to record for property access
+  const record = data as Record<string, unknown>;
 
   // Check required fields
   for (const field of REQUIRED_FIELDS) {
-    if (!(field in data) || data[field] === undefined || data[field] === null) {
+    if (!(field in record) || record[field] === undefined || record[field] === null) {
       errors.push(`Missing required field: ${field}`);
     }
   }
 
   // Type validation
-  if (data.pr_id !== undefined && typeof data.pr_id !== 'string') {
+  if (record.pr_id !== undefined && typeof record.pr_id !== 'string') {
     errors.push('pr_id must be a string');
   }
 
-  if (data.title !== undefined && typeof data.title !== 'string') {
+  if (record.title !== undefined && typeof record.title !== 'string') {
     errors.push('title must be a string');
   }
 
   // Cold state validation
-  if (data.cold_state !== undefined) {
-    if (!VALID_COLD_STATES.includes(data.cold_state)) {
+  if (record.cold_state !== undefined) {
+    if (!VALID_COLD_STATES.includes(record.cold_state as string)) {
       errors.push(
-        `Invalid cold_state "${data.cold_state}". ` +
+        `Invalid cold_state "${record.cold_state}". ` +
         `Must be one of: ${VALID_COLD_STATES.join(', ')}`
       );
     }
   }
 
   // Priority validation
-  if (data.priority !== undefined) {
-    if (!VALID_PRIORITIES.includes(data.priority)) {
+  if (record.priority !== undefined) {
+    if (!VALID_PRIORITIES.includes(record.priority)) {
       errors.push(
-        `Invalid priority "${data.priority}". ` +
+        `Invalid priority "${record.priority}". ` +
         `Must be one of: ${VALID_PRIORITIES.join(', ')}`
       );
     }
   }
 
   // Complexity validation
-  if (data.complexity !== undefined) {
-    if (typeof data.complexity !== 'object') {
+  if (record.complexity !== undefined) {
+    if (typeof record.complexity !== 'object') {
       errors.push('complexity must be an object');
     } else {
-      if (typeof data.complexity.score !== 'number') {
+      if (typeof record.complexity.score !== 'number') {
         errors.push('complexity.score must be a number');
-      } else if (data.complexity.score < 1 || data.complexity.score > 10) {
+      } else if (record.complexity.score < 1 || record.complexity.score > 10) {
         errors.push('complexity.score must be between 1 and 10');
       }
 
-      if (typeof data.complexity.estimated_minutes !== 'number') {
+      if (typeof record.complexity.estimated_minutes !== 'number') {
         errors.push('complexity.estimated_minutes must be a number');
-      } else if (data.complexity.estimated_minutes < 1 || data.complexity.estimated_minutes > 600) {
+      } else if (record.complexity.estimated_minutes < 1 || record.complexity.estimated_minutes > 600) {
         errors.push('complexity.estimated_minutes must be between 1 and 600');
       }
 
-      if (data.complexity.suggested_model !== undefined) {
-        if (!VALID_MODELS.includes(data.complexity.suggested_model)) {
+      if (record.complexity.suggested_model !== undefined) {
+        if (!VALID_MODELS.includes(record.complexity.suggested_model)) {
           errors.push(
-            `Invalid complexity.suggested_model "${data.complexity.suggested_model}". ` +
+            `Invalid complexity.suggested_model "${record.complexity.suggested_model}". ` +
             `Must be one of: ${VALID_MODELS.join(', ')}`
           );
         }
       }
 
-      if (typeof data.complexity.rationale !== 'string') {
+      if (typeof record.complexity.rationale !== 'string') {
         errors.push('complexity.rationale must be a string');
       }
     }
   }
 
   // Dependencies validation
-  if (data.dependencies !== undefined) {
-    if (!Array.isArray(data.dependencies)) {
+  if (record.dependencies !== undefined) {
+    if (!Array.isArray(record.dependencies)) {
       errors.push('dependencies must be an array');
     } else {
-      for (const dep of data.dependencies) {
+      for (const dep of record.dependencies) {
         if (typeof dep !== 'string') {
           errors.push(`Invalid dependency: ${dep} (must be string)`);
         } else if (allPRIds && dep !== '' && !allPRIds.has(dep)) {
@@ -124,12 +136,12 @@ export function validatePR(data: any, allPRIds?: Set<string>): ValidationResult 
   }
 
   // File estimates validation
-  if (data.estimated_files !== undefined) {
-    if (!Array.isArray(data.estimated_files)) {
+  if (record.estimated_files !== undefined) {
+    if (!Array.isArray(record.estimated_files)) {
       errors.push('estimated_files must be an array');
     } else {
-      for (let i = 0; i < data.estimated_files.length; i++) {
-        const file = data.estimated_files[i];
+      for (let i = 0; i < record.estimated_files.length; i++) {
+        const file = record.estimated_files[i];
         if (typeof file !== 'object') {
           errors.push(`estimated_files[${i}] must be an object`);
           continue;
@@ -153,12 +165,12 @@ export function validatePR(data: any, allPRIds?: Set<string>): ValidationResult 
   }
 
   // Actual files validation
-  if (data.actual_files !== undefined) {
-    if (!Array.isArray(data.actual_files)) {
+  if (record.actual_files !== undefined) {
+    if (!Array.isArray(record.actual_files)) {
       errors.push('actual_files must be an array');
     } else {
-      for (let i = 0; i < data.actual_files.length; i++) {
-        const file = data.actual_files[i];
+      for (let i = 0; i < record.actual_files.length; i++) {
+        const file = record.actual_files[i];
         if (typeof file !== 'object') {
           errors.push(`actual_files[${i}] must be an object`);
           continue;

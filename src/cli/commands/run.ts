@@ -11,6 +11,17 @@ import { OutputFormatter } from '../formatters';
 import { formatCLIError } from '../errors';
 
 /**
+ * Commander.js options for run command
+ */
+interface RunCommandOptions {
+  watch?: boolean;
+  agent?: string;
+  model?: string;
+  budget?: number;
+  dryRun?: boolean;
+}
+
+/**
  * Create run command
  */
 export function createRunCommand(): Command {
@@ -30,7 +41,7 @@ export function createRunCommand(): Command {
 /**
  * Handle run command
  */
-async function handleRun(prId: string | undefined, options: any): Promise<void> {
+async function handleRun(prId: string | undefined, options: RunCommandOptions): Promise<void> {
   const client = new HubClient();
 
   const runOptions: RunOptions = {

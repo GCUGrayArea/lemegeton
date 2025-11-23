@@ -69,16 +69,17 @@ export async function checkDockerAvailability(): Promise<DockerAvailability> {
       platform: infoStdout.trim(),
     };
 
-  } catch (error: any) {
+  } catch (error) {
+    const err = error as Error;
     // Check specific error cases
-    if (error.message?.includes('not found') || error.message?.includes('not recognized')) {
+    if (err.message?.includes('not found') || err.message?.includes('not recognized')) {
       return {
         available: false,
         error: 'Docker not installed',
       };
     }
 
-    if (error.message?.includes('Cannot connect to the Docker daemon')) {
+    if (err.message?.includes('Cannot connect to the Docker daemon')) {
       return {
         available: false,
         error: 'Docker daemon not running',
@@ -87,7 +88,7 @@ export async function checkDockerAvailability(): Promise<DockerAvailability> {
 
     return {
       available: false,
-      error: error.message || 'Unknown error checking Docker availability',
+      error: err.message || 'Unknown error checking Docker availability',
     };
   }
 }
@@ -99,7 +100,7 @@ export async function isPortAvailable(port: number, host: string = 'localhost'):
   return new Promise((resolve) => {
     const server = net.createServer();
 
-    server.once('error', (err: any) => {
+    server.once('error', (err: NodeJS.ErrnoException) => {
       if (err.code === 'EADDRINUSE') {
         resolve(false);
       } else {
@@ -252,11 +253,12 @@ export async function runContainer(options: {
       success: true,
     };
 
-  } catch (error: any) {
+  } catch (error) {
+    const err = error as Error;
     return {
       containerId: '',
       success: false,
-      error: error.message || 'Failed to run container',
+      error: err.message || 'Failed to run container',
     };
   }
 }
@@ -326,8 +328,9 @@ export async function getContainerLogs(
       }
     );
     return { stdout, stderr };
-  } catch (error: any) {
-    return { stdout: '', stderr: error.message || 'Failed to get logs' };
+  } catch (error) {
+    const err = error as Error;
+    return { stdout: '', stderr: err.message || 'Failed to get logs' };
   }
 }
 

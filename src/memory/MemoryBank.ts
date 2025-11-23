@@ -26,9 +26,18 @@ import {
   UpdateContext,
 } from '../types/memory';
 
+/**
+ * Minimal Redis client interface for MemoryBank caching
+ */
+interface RedisCache {
+  get(key: string): Promise<string | null>;
+  setex(key: string, ttl: number, value: string): Promise<void>;
+  del(key: string | string[]): Promise<number>;
+}
+
 export class MemoryBank {
   private adapter: MemoryAdapter;
-  private redis: any; // Use any to avoid complex Redis type issues
+  private redis: RedisCache;
   private cacheKeyPrefix = 'memory:';
   private cacheTTL = 3600; // 1 hour
 
@@ -38,7 +47,7 @@ export class MemoryBank {
    * @param adapter - Storage adapter (FileMemoryAdapter or VectorMemoryAdapter)
    * @param redis - Redis client for caching
    */
-  constructor(adapter: MemoryAdapter, redis: any) {
+  constructor(adapter: MemoryAdapter, redis: RedisCache) {
     this.adapter = adapter;
     this.redis = redis;
   }

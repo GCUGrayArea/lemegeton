@@ -259,9 +259,10 @@ export class FileMessaging extends EventEmitter implements IMessageTransport {
           this.emit('processError', { channel, file, error });
         }
       }
-    } catch (error: any) {
+    } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
       // Channel directory might not exist yet
-      if (error.code !== 'ENOENT') {
+      if (nodeError.code !== 'ENOENT') {
         this.stats.pollErrors++;
         this.emit('pollError', { channel, error });
       }

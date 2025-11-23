@@ -319,7 +319,7 @@ export class MISScheduler {
   /**
    * Get scheduler statistics
    */
-  getStats(): any {
+  getStats(): import('./types').MISStats {
     const graphStats = this.dependencyGraph.getStats();
     const conflictStats = this.conflictDetector.getStats();
 
@@ -328,8 +328,8 @@ export class MISScheduler {
       conflicts: conflictStats,
       cache: {
         size: this.resultCache.size,
-        enabled: this.config.enableCaching,
-        ttl: this.config.cacheTTL,
+        enabled: this.config.enableCaching ?? false,
+        ttl: this.config.cacheTTL ?? 300,
       },
       config: this.config,
     };

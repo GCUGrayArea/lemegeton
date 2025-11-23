@@ -85,8 +85,9 @@ export class DaemonManager {
         // Wait for process to exit (with timeout)
         await this.waitForProcessExit(pid, 30000);
         console.log('[Daemon] Hub stopped');
-      } catch (error: any) {
-        if (error.code === 'ESRCH') {
+      } catch (error) {
+        const nodeError = error as NodeJS.ErrnoException;
+        if (nodeError.code === 'ESRCH') {
           console.log('[Daemon] Process not found, cleaning up PID file');
         } else {
           throw error;
@@ -111,8 +112,9 @@ export class DaemonManager {
       // Check if process exists
       process.kill(pid, 0);
       return true;
-    } catch (error: any) {
-      if (error.code === 'ENOENT' || error.code === 'ESRCH') {
+    } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code === 'ENOENT' || nodeError.code === 'ESRCH') {
         // PID file doesn't exist or process doesn't exist
         return false;
       }
@@ -221,15 +223,16 @@ export class DaemonManager {
       const fd = logStream.fd;
 
       // Redirect stdout and stderr
+      // Note: Intentionally overriding Node.js WriteStream.write for daemonization
       if (process.stdout.isTTY) {
-        (process.stdout as any).write = (chunk: any) => {
+        (process.stdout as NodeJS.WriteStream & { write: (chunk: string | Uint8Array) => boolean }).write = (chunk: string | Uint8Array) => {
           fs.appendFile(this.logFilePath, chunk);
           return true;
         };
       }
 
       if (process.stderr.isTTY) {
-        (process.stderr as any).write = (chunk: any) => {
+        (process.stderr as NodeJS.WriteStream & { write: (chunk: string | Uint8Array) => boolean }).write = (chunk: string | Uint8Array) => {
           fs.appendFile(this.logFilePath, chunk);
           return true;
         };
@@ -294,8 +297,9 @@ export class DaemonManager {
       const content = await fs.readFile(this.pidFilePath, 'utf-8');
       const pid = parseInt(content.trim(), 10);
       return isNaN(pid) ? null : pid;
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
+    } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
+      if (nodeError.code === 'ENOENT') {
         return null;
       }
       throw error;
@@ -313,8 +317,9 @@ export class DaemonManager {
         process.kill(pid, 0);
         // Process still exists, wait a bit
         await new Promise(resolve => setTimeout(resolve, 100));
-      } catch (error: any) {
-        if (error.code === 'ESRCH') {
+      } catch (error) {
+        const nodeError = error as NodeJS.ErrnoException;
+        if (nodeError.code === 'ESRCH') {
           // Process no longer exists
           return;
         }

@@ -47,7 +47,7 @@ export class DependencyGraph {
   /**
    * Build graph from task list data
    */
-  buildFromTaskList(taskList: any): void {
+  buildFromTaskList(taskList: import('../parser/types').ParsedTaskList): void {
     // Clear existing graph
     this.clear();
 
@@ -416,8 +416,8 @@ export class DependencyGraph {
   /**
    * Export graph to JSON for debugging
    */
-  toJSON(): any {
-    const nodes: any[] = [];
+  toJSON(): import('./types').DependencyGraphJSON {
+    const nodes: import('./types').SerializedPRNode[] = [];
 
     for (const node of this.nodes.values()) {
       nodes.push({

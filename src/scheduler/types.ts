@@ -188,3 +188,99 @@ export interface TraversalOptions {
   /** Maximum depth to traverse */
   maxDepth?: number;
 }
+
+/**
+ * Serialized conflict for JSON export
+ */
+export interface SerializedConflict {
+  pr1: string;
+  pr2: string;
+  files: string[];
+}
+
+/**
+ * Conflict detector JSON export
+ */
+export interface ConflictJSON {
+  conflicts: SerializedConflict[];
+  fileMap: Record<string, string[]>;
+  totalConflicts: number;
+  totalFiles: number;
+}
+
+/**
+ * Serialized PR node for JSON export
+ */
+export interface SerializedPRNode {
+  id: string;
+  title: string;
+  state: ColdState;
+  dependencies: string[];
+  dependents: string[];
+  files: string[];
+  priority: Priority;
+  complexity: number;
+}
+
+/**
+ * Dependency graph JSON export
+ */
+export interface DependencyGraphJSON {
+  nodes: SerializedPRNode[];
+  completedPRs: string[];
+  workingPRs: string[];
+}
+
+/**
+ * Assignment manager statistics
+ */
+export interface AssignmentStats {
+  totalAssignments: number;
+  activeAgents: number;
+  avgComplexity: number;
+  totalEstimatedTime: number;
+  strategy: string;
+}
+
+/**
+ * MIS scheduler statistics
+ */
+export interface MISStats {
+  graph: SchedulerStats;
+  conflicts: ConflictStats;
+  cache: {
+    size: number;
+    enabled: boolean;
+    ttl: number;
+  };
+  config: SchedulerConfig;
+}
+
+/**
+ * Conflict detector statistics
+ */
+export interface ConflictStats {
+  totalConflicts: number;
+  totalFiles: number;
+  mostConflictedPR?: string;
+  mostConflictedFile?: string;
+}
+
+/**
+ * Detailed scheduler statistics (combines all subsystems)
+ */
+export interface DetailedSchedulerStats {
+  scheduler: MISStats;
+  assignments: AssignmentStats;
+  lastResult: SchedulerResult | null;
+}
+
+/**
+ * Full scheduler state export for debugging
+ */
+export interface SchedulerStateExport {
+  graph: DependencyGraphJSON;
+  conflicts: ConflictJSON;
+  assignments: Assignment[];
+  lastResult: SchedulerResult | null;
+}

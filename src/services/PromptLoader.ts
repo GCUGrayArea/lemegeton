@@ -27,10 +27,20 @@ import {
 const PROMPT_KEY_PREFIX = 'prompt:';
 
 /**
+ * Minimal Redis client interface for PromptLoader caching
+ */
+interface RedisPromptCache {
+  get(key: string): Promise<string | null>;
+  set(key: string, value: string): Promise<void>;
+  exists(key: string): Promise<number>;
+  del(keys: string[]): Promise<number>;
+}
+
+/**
  * Service for loading and caching prompts
  */
 export class PromptLoader {
-  private redis: any; // Use any to avoid complex Redis type issues
+  private redis: RedisPromptCache;
   private promptsDir: string;
 
   /**
@@ -39,7 +49,7 @@ export class PromptLoader {
    * @param redis - Connected Redis client
    * @param promptsDir - Optional path to prompts directory (defaults to bundled prompts)
    */
-  constructor(redis: any, promptsDir?: string) {
+  constructor(redis: RedisPromptCache, promptsDir?: string) {
     this.redis = redis;
     // Default to bundled prompts directory (relative to compiled dist)
     this.promptsDir = promptsDir || path.join(__dirname, '../../prompts');

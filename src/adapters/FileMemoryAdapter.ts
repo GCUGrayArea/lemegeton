@@ -57,9 +57,10 @@ export class FileMemoryAdapter implements MemoryAdapter {
     try {
       const content = await fs.readFile(filePath, 'utf8');
       return content;
-    } catch (error: any) {
+    } catch (error) {
+      const nodeError = error as NodeJS.ErrnoException;
       // Return default content if file doesn't exist
-      if (error.code === 'ENOENT') {
+      if (nodeError.code === 'ENOENT') {
         return this.getDefaultContent(file);
       }
       throw error;

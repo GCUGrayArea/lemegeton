@@ -50,7 +50,7 @@ export class Scheduler {
   /**
    * Initialize scheduler with task list
    */
-  async initialize(taskList: any): Promise<void> {
+  async initialize(taskList: import('../parser/types').ParsedTaskList): Promise<void> {
     this.dependencyGraph.buildFromTaskList(taskList);
   }
 
@@ -172,7 +172,7 @@ export class Scheduler {
   /**
    * Get detailed statistics
    */
-  getDetailedStats(): any {
+  getDetailedStats(): import('./types').DetailedSchedulerStats {
     return {
       scheduler: this.misScheduler.getStats(),
       assignments: this.assignmentManager.getStats(),
@@ -194,7 +194,7 @@ export class Scheduler {
   /**
    * Export state for debugging
    */
-  exportState(): any {
+  exportState(): import('./types').SchedulerStateExport {
     return {
       graph: this.dependencyGraph.toJSON(),
       conflicts: this.conflictDetector.toJSON(),

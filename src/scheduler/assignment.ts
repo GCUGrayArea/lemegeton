@@ -613,7 +613,7 @@ export class AssignmentManager {
   /**
    * Get statistics
    */
-  getStats(): any {
+  getStats(): import('./types').AssignmentStats {
     const totalAssignments = this.assignments.size;
     const activeAgents = this.agentAssignments.size;
 

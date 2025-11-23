@@ -10,6 +10,14 @@ import { OutputFormatter } from '../formatters';
 import { formatCLIError } from '../errors';
 
 /**
+ * Commander.js options for status command
+ */
+interface StatusCommandOptions {
+  json?: boolean;
+  watch?: boolean;
+}
+
+/**
  * Create status command
  */
 export function createStatusCommand(): Command {
@@ -25,7 +33,7 @@ export function createStatusCommand(): Command {
 /**
  * Handle status command
  */
-async function handleStatus(options: any): Promise<void> {
+async function handleStatus(options: StatusCommandOptions): Promise<void> {
   const client = new HubClient();
 
   try {
@@ -45,7 +53,7 @@ async function handleStatus(options: any): Promise<void> {
 /**
  * Show status once
  */
-async function showStatusOnce(client: HubClient, options: any): Promise<void> {
+async function showStatusOnce(client: HubClient, options: StatusCommandOptions): Promise<void> {
   try {
     const status = await client.getStatus();
     const output = OutputFormatter.formatHubStatus(status, options.json);
@@ -58,7 +66,7 @@ async function showStatusOnce(client: HubClient, options: any): Promise<void> {
 /**
  * Watch status continuously
  */
-async function watchStatus(client: HubClient, options: any): Promise<void> {
+async function watchStatus(client: HubClient, options: StatusCommandOptions): Promise<void> {
   console.log(OutputFormatter.info('Watching status (updates every 5 seconds)'));
   console.log(OutputFormatter.info('Press Ctrl+C to stop'));
   console.log('');

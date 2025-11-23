@@ -11,6 +11,31 @@ export interface AnthropicClientConfig {
   baseURL?: string;
 }
 
+/**
+ * Anthropic API request payload
+ */
+interface AnthropicAPIRequest {
+  model: string;
+  messages: Array<{ role: string; content: string }>;
+  max_tokens: number;
+  system?: string;
+  temperature?: number;
+  stop_sequences?: string[];
+}
+
+/**
+ * Anthropic API response structure
+ */
+interface AnthropicAPIResponse {
+  content: Array<{ text: string; type: string }>;
+  model: string;
+  usage: {
+    input_tokens: number;
+    output_tokens: number;
+  };
+  stop_reason: string;
+}
+
 export class AnthropicClient implements LLMClient {
   private apiKey: string;
   private baseURL: string;
@@ -26,7 +51,7 @@ export class AnthropicClient implements LLMClient {
       content: msg.content,
     }));
 
-    const body: any = {
+    const body: AnthropicAPIRequest = {
       model: request.model,
       messages,
       max_tokens: request.maxTokens || 4096,
@@ -59,7 +84,7 @@ export class AnthropicClient implements LLMClient {
       throw new Error(`Anthropic API error: ${response.status} ${error}`);
     }
 
-    const data: any = await response.json();
+    const data: AnthropicAPIResponse = await response.json();
 
     return {
       content: data.content[0].text,

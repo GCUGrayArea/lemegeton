@@ -214,8 +214,8 @@ export class ConflictDetector {
   /**
    * Export conflicts to JSON for debugging
    */
-  toJSON(): any {
-    const conflicts: any[] = [];
+  toJSON(): import('./types').ConflictJSON {
+    const conflicts: import('./types').SerializedConflict[] = [];
 
     for (const [key, files] of this.conflicts.entries()) {
       const [pr1, pr2] = key.split('|');
@@ -226,7 +226,7 @@ export class ConflictDetector {
       });
     }
 
-    const fileMap: any = {};
+    const fileMap: Record<string, string[]> = {};
     for (const [file, prs] of this.fileToPRs.entries()) {
       fileMap[file] = Array.from(prs);
     }

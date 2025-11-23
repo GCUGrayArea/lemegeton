@@ -11,6 +11,37 @@ import { OutputFormatter } from '../formatters';
 import { formatCLIError } from '../errors';
 
 /**
+ * Commander.js options for hub start command
+ */
+interface HubStartOptions {
+  config?: string;
+  foreground?: boolean;
+  verbose?: boolean;
+}
+
+/**
+ * Commander.js options for hub stop command
+ */
+interface HubStopOptions {
+  force?: boolean;
+  timeout: string;
+}
+
+/**
+ * Commander.js options for hub status command
+ */
+interface HubStatusOptions {
+  json?: boolean;
+}
+
+/**
+ * Commander.js options for hub restart command
+ */
+interface HubRestartOptions {
+  timeout: string;
+}
+
+/**
  * Create hub command group
  */
 export function createHubCommands(): Command {
@@ -58,7 +89,7 @@ export function createHubCommands(): Command {
 /**
  * Handle hub start command
  */
-async function handleHubStart(options: any): Promise<void> {
+async function handleHubStart(options: HubStartOptions): Promise<void> {
   const client = new HubClient();
   const spinner = ora('Starting Hub daemon...').start();
 
@@ -89,7 +120,7 @@ async function handleHubStart(options: any): Promise<void> {
 /**
  * Handle hub stop command
  */
-async function handleHubStop(options: any): Promise<void> {
+async function handleHubStop(options: HubStopOptions): Promise<void> {
   const client = new HubClient();
   const spinner = ora('Stopping Hub daemon...').start();
 
@@ -110,7 +141,7 @@ async function handleHubStop(options: any): Promise<void> {
 /**
  * Handle hub status command
  */
-async function handleHubStatus(options: any): Promise<void> {
+async function handleHubStatus(options: HubStatusOptions): Promise<void> {
   const client = new HubClient();
 
   try {
@@ -128,7 +159,7 @@ async function handleHubStatus(options: any): Promise<void> {
 /**
  * Handle hub restart command
  */
-async function handleHubRestart(options: any): Promise<void> {
+async function handleHubRestart(options: HubRestartOptions): Promise<void> {
   const client = new HubClient();
   const spinner = ora('Restarting Hub daemon...').start();
 

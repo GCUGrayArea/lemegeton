@@ -5,7 +5,7 @@
  * and maintaining clean git history.
  */
 
-import simpleGit, { SimpleGit } from 'simple-git';
+import simpleGit, { SimpleGit, LogResult, DefaultLogFields } from 'simple-git';
 import { TaskListParser } from '../parser/taskList';
 import { ParsedTaskList, PRData } from '../parser/types';
 import { ColdState, PRState } from '../types/pr';
@@ -173,7 +173,7 @@ export class GitOps implements IGitCommitter {
       });
 
       // Check for any commits that shouldn't be there
-      const invalidCommits = log.all.filter((commit: any) => {
+      const invalidCommits = log.all.filter((commit: DefaultLogFields) => {
         const msg = commit.message.toLowerCase();
         // Exclude heartbeat, hot-to-hot transitions, etc.
         return (
