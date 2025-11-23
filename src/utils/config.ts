@@ -6,6 +6,68 @@
  */
 
 /**
+ * Configuration error for invalid values
+ */
+export class ConfigError extends Error {
+  constructor(message: string, public readonly key?: string, public readonly value?: unknown) {
+    super(message);
+    this.name = 'ConfigError';
+  }
+}
+
+/**
+ * Safely parse an integer from a string value
+ *
+ * @param value - String value to parse
+ * @param defaultValue - Default value if parsing fails or value is undefined
+ * @param key - Optional key name for error messages
+ * @returns Parsed integer or default value
+ * @throws ConfigError if value is provided but invalid
+ */
+export function parseIntSafe(value: string | undefined, defaultValue: number, key?: string): number {
+  if (value === undefined || value === '') {
+    return defaultValue;
+  }
+
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) {
+    throw new ConfigError(
+      `Invalid integer value${key ? ` for ${key}` : ''}: "${value}"`,
+      key,
+      value
+    );
+  }
+
+  return parsed;
+}
+
+/**
+ * Safely parse a float from a string value
+ *
+ * @param value - String value to parse
+ * @param defaultValue - Default value if parsing fails or value is undefined
+ * @param key - Optional key name for error messages
+ * @returns Parsed float or default value
+ * @throws ConfigError if value is provided but invalid
+ */
+export function parseFloatSafe(value: string | undefined, defaultValue: number, key?: string): number {
+  if (value === undefined || value === '') {
+    return defaultValue;
+  }
+
+  const parsed = parseFloat(value);
+  if (isNaN(parsed)) {
+    throw new ConfigError(
+      `Invalid float value${key ? ` for ${key}` : ''}: "${value}"`,
+      key,
+      value
+    );
+  }
+
+  return parsed;
+}
+
+/**
  * Deep merge configuration objects with type safety.
  *
  * Recursively merges nested objects, with override values taking precedence.

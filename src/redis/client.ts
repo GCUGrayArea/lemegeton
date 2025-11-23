@@ -8,6 +8,16 @@
 import { createClient, RedisClientType, RedisFunctions, RedisModules, RedisScripts } from 'redis';
 import { EventEmitter } from 'events';
 import { getConfig, getRedisUrl } from '../config';
+
+/**
+ * Required retry configuration (all optionals resolved)
+ */
+interface RequiredRetryConfig {
+  maxAttempts: number;
+  initialDelay: number;
+  maxDelay: number;
+  factor: number;
+}
 import { RedisError, ErrorCode } from '../types';
 
 /**
@@ -53,10 +63,20 @@ export class RedisClient extends EventEmitter {
   private isClosing = false;
 
   private readonly url: string;
+  private readonly retryConfig: RequiredRetryConfig;
 
   constructor(url?: string) {
     super();
     this.url = url || getRedisUrl();
+
+    // Resolve all retry config optionals at construction
+    const config = getConfig();
+    this.retryConfig = {
+      maxAttempts: config.redis.retry?.maxAttempts ?? 10,
+      initialDelay: config.redis.retry?.initialDelay ?? 1000,
+      maxDelay: config.redis.retry?.maxDelay ?? 30000,
+      factor: config.redis.retry?.factor ?? 2,
+    };
   }
 
   /**
@@ -137,14 +157,6 @@ export class RedisClient extends EventEmitter {
   private createRedisClient(): LemegetonRedisClient {
     const config = getConfig();
 
-    // Resolve retry configuration with defaults
-    const retryConfig = {
-      maxAttempts: config.redis.retry?.maxAttempts ?? 10,
-      initialDelay: config.redis.retry?.initialDelay ?? 1000,
-      maxDelay: config.redis.retry?.maxDelay ?? 30000,
-      factor: config.redis.retry?.factor ?? 2,
-    };
-
     const client = createClient({
       url: this.url,
       socket: {
@@ -155,17 +167,17 @@ export class RedisClient extends EventEmitter {
             return false;
           }
 
-          // Check max attempts
-          if (retries >= retryConfig.maxAttempts) {
+          // Check max attempts - now using fully-resolved config
+          if (retries >= this.retryConfig.maxAttempts) {
             this.setState(RedisConnectionState.ERROR);
             this.emit('error', new Error(`Failed to connect after ${retries} attempts`));
             return false;
           }
 
-          // Calculate delay with exponential backoff
+          // Calculate delay with exponential backoff - no more non-null assertions
           const delay = Math.min(
-            retryConfig.initialDelay * Math.pow(retryConfig.factor, retries),
-            retryConfig.maxDelay
+            this.retryConfig.initialDelay * Math.pow(this.retryConfig.factor, retries),
+            this.retryConfig.maxDelay
           );
 
           this.reconnectAttempt = retries + 1;
