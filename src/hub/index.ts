@@ -23,6 +23,7 @@ import { ConnectionManager } from './connectionManager';
 import { CoordinationSetup } from './coordinationSetup';
 import { StateMachineSetup } from './stateMachineSetup';
 import { HeartbeatMonitor } from './heartbeatMonitor';
+import { mergeConfig } from '../utils/config';
 
 /**
  * Hub configuration
@@ -108,15 +109,14 @@ export class Hub extends EventEmitter {
   private shutdownPromise: Promise<void> | null = null;
   private acceptingWork: boolean = true;
 
+  // Signal handlers for cleanup
+  private signalHandlers = new Map<NodeJS.Signals, () => void>();
+  private exceptionHandler: ((error: Error) => void) | null = null;
+  private rejectionHandler: ((reason: unknown, promise: Promise<unknown>) => void) | null = null;
+
   constructor(config: HubConfig = {}) {
     super();
-    this.config = {
-      ...DEFAULT_HUB_CONFIG,
-      redis: { ...DEFAULT_HUB_CONFIG.redis, ...config.redis },
-      daemon: { ...DEFAULT_HUB_CONFIG.daemon, ...config.daemon },
-      heartbeat: { ...DEFAULT_HUB_CONFIG.heartbeat, ...config.heartbeat },
-      shutdown: { ...DEFAULT_HUB_CONFIG.shutdown, ...config.shutdown },
-    };
+    this.config = mergeConfig(DEFAULT_HUB_CONFIG, config);
 
     // Initialize managers
     this.connectionManager = new ConnectionManager({
@@ -276,49 +276,122 @@ export class Hub extends EventEmitter {
 
     const shutdownSignals: NodeJS.Signals[] = ['SIGTERM', 'SIGINT', 'SIGHUP'];
 
+    // Store signal handlers for cleanup
     for (const signal of shutdownSignals) {
-      process.on(signal, async () => {
-        console.log(`[Hub] Received ${signal}`);
-        await this.stop();
-        process.exit(0);
-      });
+      const handler = async () => {
+        try {
+          console.log(`[Hub] Received ${signal}`);
+          await this.stop();
+          process.exit(0);
+        } catch (error) {
+          console.error(`[Hub] Error during ${signal} shutdown:`, error);
+          process.exit(1);
+        }
+      };
+
+      this.signalHandlers.set(signal, handler);
+      process.on(signal, handler);
     }
 
-    // Handle uncaught errors
-    process.on('uncaughtException', async (error) => {
-      console.error('[Hub] Uncaught exception:', error);
-      this.emit('error', error);
-      await this.stop();
-      process.exit(1);
-    });
+    // Store exception handler
+    this.exceptionHandler = async (error: Error) => {
+      try {
+        console.error('[Hub] Uncaught exception:', error);
+        this.emit('error', error);
+        await this.stop();
+        process.exit(1);
+      } catch (stopError) {
+        console.error('[Hub] Failed to stop after uncaught exception:', stopError);
+        process.exit(1);
+      }
+    };
+    process.on('uncaughtException', this.exceptionHandler);
 
-    process.on('unhandledRejection', async (reason, promise) => {
-      console.error('[Hub] Unhandled rejection:', reason);
-      this.emit('error', new Error(`Unhandled rejection: ${reason}`));
-      await this.stop();
-      process.exit(1);
-    });
+    // Store rejection handler
+    this.rejectionHandler = async (reason: unknown, promise: Promise<unknown>) => {
+      try {
+        console.error('[Hub] Unhandled rejection:', reason);
+        this.emit('error', new Error(`Unhandled rejection: ${reason}`));
+        await this.stop();
+        process.exit(1);
+      } catch (stopError) {
+        console.error('[Hub] Failed to stop after unhandled rejection:', stopError);
+        process.exit(1);
+      }
+    };
+    process.on('unhandledRejection', this.rejectionHandler);
+  }
+
+  /**
+   * Remove shutdown handlers to prevent memory leaks
+   * This method never throws - it logs errors and continues cleanup
+   */
+  private removeShutdownHandlers(): void {
+    try {
+      // Remove signal handlers
+      for (const [signal, handler] of this.signalHandlers) {
+        try {
+          process.off(signal, handler);
+        } catch (error) {
+          console.error(`[Hub] Failed to remove signal handler for ${signal}:`, error);
+        }
+      }
+      this.signalHandlers.clear();
+    } catch (error) {
+      console.error('[Hub] Failed to clear signal handlers:', error);
+    }
+
+    try {
+      // Remove exception handler
+      if (this.exceptionHandler) {
+        process.off('uncaughtException', this.exceptionHandler);
+        this.exceptionHandler = null;
+      }
+    } catch (error) {
+      console.error('[Hub] Failed to remove exception handler:', error);
+    }
+
+    try {
+      // Remove rejection handler
+      if (this.rejectionHandler) {
+        process.off('unhandledRejection', this.rejectionHandler);
+        this.rejectionHandler = null;
+      }
+    } catch (error) {
+      console.error('[Hub] Failed to remove rejection handler:', error);
+    }
   }
 
   /**
    * Clean up resources
    */
   private async cleanup(): Promise<void> {
-    try {
-      // Stop lease manager (doesn't have a stop method, just cleanup heartbeats)
-      if (this.leaseManager) {
-        // LeaseManager will be garbage collected
-        this.leaseManager = null;
+    // Helper to safely execute cleanup operations
+    const safeCleanup = async (operation: string, fn: () => void | Promise<void>): Promise<void> => {
+      try {
+        await fn();
+      } catch (error) {
+        console.error(`[Hub] Cleanup error (${operation}):`, error);
       }
+    };
 
-      // Stop coordination setup (includes mode manager and health checker)
-      await this.coordinationSetup.stop();
+    // Remove shutdown handlers to prevent memory leaks
+    await safeCleanup('removeShutdownHandlers', () => this.removeShutdownHandlers());
 
-      // Disconnect Redis and cleanup
-      await this.connectionManager.disconnect();
-    } catch (error) {
-      console.error('[Hub] Cleanup error:', error);
+    // Stop lease manager (doesn't have a stop method, just cleanup heartbeats)
+    if (this.leaseManager) {
+      this.leaseManager = null;
     }
+
+    // Stop coordination setup (includes mode manager and health checker)
+    await safeCleanup('coordinationSetup', async () => {
+      await this.coordinationSetup.stop();
+    });
+
+    // Disconnect Redis and cleanup
+    await safeCleanup('connectionManager', async () => {
+      await this.connectionManager.disconnect();
+    });
   }
 
   /**
