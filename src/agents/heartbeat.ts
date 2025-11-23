@@ -5,12 +5,14 @@
 import { AgentState, AgentHeartbeat, HeartbeatAck } from './types';
 import { EventEmitter } from 'events';
 import { mergeConfig } from '../utils/config';
+import { Clock, getSystemClock } from '../utils/testability';
 
 export interface HeartbeatConfig {
   interval: number;        // Heartbeat interval in ms (default: 30000)
   timeout: number;         // Timeout after missed heartbeats in ms (default: 90000)
   includeMetrics: boolean; // Include memory/CPU metrics
   includeProgress: boolean; // Include work progress
+  clock?: Clock;           // Injectable clock for testability
 }
 
 const DEFAULT_CONFIG: HeartbeatConfig = {
@@ -22,6 +24,7 @@ const DEFAULT_CONFIG: HeartbeatConfig = {
 
 export class HeartbeatManager extends EventEmitter {
   private config: HeartbeatConfig;
+  private clock: Clock;
   private interval: NodeJS.Timeout | null = null;
   private lastSent: number = 0;
   private lastAck: number = 0;
@@ -37,6 +40,7 @@ export class HeartbeatManager extends EventEmitter {
   ) {
     super();
     this.config = mergeConfig(DEFAULT_CONFIG, config);
+    this.clock = config.clock ?? getSystemClock();
   }
 
   /**
@@ -48,13 +52,13 @@ export class HeartbeatManager extends EventEmitter {
     }
 
     this.running = true;
-    this.lastAck = Date.now();
+    this.lastAck = this.clock.now();
 
     // Send initial heartbeat
     await this.send();
 
     // Start interval
-    this.interval = setInterval(async () => {
+    this.interval = this.clock.setInterval(async () => {
       await this.send();
     }, this.config.interval);
   }
@@ -70,7 +74,7 @@ export class HeartbeatManager extends EventEmitter {
     this.running = false;
 
     if (this.interval) {
-      clearInterval(this.interval);
+      this.clock.clearInterval(this.interval);
       this.interval = null;
     }
   }
@@ -89,19 +93,19 @@ export class HeartbeatManager extends EventEmitter {
       state: this.getState(),
       prId: this.getPrId(),
       memoryUsage: this.config.includeMetrics ? this.getMemoryUsage() : 0,
-      timestamp: Date.now(),
+      timestamp: this.clock.now(),
     };
 
     try {
       await this.sendMessage(heartbeat);
-      this.lastSent = Date.now();
+      this.lastSent = this.clock.now();
       this.emit('sent', heartbeat);
     } catch (error) {
       this.emit('error', error);
       this.missedAcks++;
 
       // Check for timeout
-      const timeSinceLastAck = Date.now() - this.lastAck;
+      const timeSinceLastAck = this.clock.now() - this.lastAck;
       if (timeSinceLastAck > this.config.timeout) {
         this.emit('timeout', { missedAcks: this.missedAcks, lastAck: this.lastAck });
       }
@@ -121,7 +125,7 @@ export class HeartbeatManager extends EventEmitter {
    * Check if heartbeat is alive
    */
   isAlive(): boolean {
-    const timeSinceLastAck = Date.now() - this.lastAck;
+    const timeSinceLastAck = this.clock.now() - this.lastAck;
     return timeSinceLastAck < this.config.timeout;
   }
 
@@ -148,7 +152,7 @@ export class HeartbeatManager extends EventEmitter {
       lastAck: this.lastAck,
       missedAcks: this.missedAcks,
       isAlive: this.isAlive(),
-      timeSinceLastAck: Date.now() - this.lastAck,
+      timeSinceLastAck: this.clock.now() - this.lastAck,
     };
   }
 }

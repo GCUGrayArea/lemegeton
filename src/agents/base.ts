@@ -26,6 +26,7 @@ import { HeartbeatManager, HeartbeatConfig } from './heartbeat';
 import { CommunicationManager } from './communication';
 import { RecoveryManager } from './recovery';
 import { isNodeError, getErrorCode } from '../types';
+import { Clock, getSystemClock } from '../utils/testability';
 
 export interface AgentConfig {
   agentType: string;
@@ -35,6 +36,8 @@ export interface AgentConfig {
   maxRetries?: number;
   retryDelay?: number;
   shutdownTimeout?: number;
+  /** Injectable clock for testability (defaults to system clock) */
+  clock?: Clock;
 }
 
 /**
@@ -55,6 +58,9 @@ export abstract class BaseAgent extends EventEmitter {
   // Configuration
   protected config: AgentConfig;
 
+  // Injectable dependencies for testability
+  private clock: Clock;
+
   // Timing
   protected startTime: number = 0;
   protected workStartTime: number = 0;
@@ -73,6 +79,9 @@ export abstract class BaseAgent extends EventEmitter {
     this.agentId = agentId;
     this.agentType = config.agentType;
     this.config = config;
+
+    // Initialize injectable dependencies (defaults to system implementations)
+    this.clock = config.clock ?? getSystemClock();
 
     // Initialize lifecycle
     this.lifecycle = new LifecycleManager();
@@ -139,7 +148,7 @@ export abstract class BaseAgent extends EventEmitter {
 
     // Clear any existing shutdown timer
     if (this.shutdownTimer) {
-      clearTimeout(this.shutdownTimer);
+      this.clock.clearTimeout(this.shutdownTimer);
       this.shutdownTimer = null;
     }
 
@@ -161,7 +170,7 @@ export abstract class BaseAgent extends EventEmitter {
       this.emit('stopped');
     } catch (error) {
       // Store timer reference for proper cleanup
-      this.shutdownTimer = setTimeout(() => {
+      this.shutdownTimer = this.clock.setTimeout(() => {
         this.lifecycle.forceState(AgentState.STOPPED);
         this.emit('forceStopped');
         this.shutdownTimer = null;  // Clear reference after firing
@@ -436,7 +445,7 @@ export abstract class BaseAgent extends EventEmitter {
   async cleanup(): Promise<void> {
     // Clear shutdown timer if exists
     if (this.shutdownTimer) {
-      clearTimeout(this.shutdownTimer);
+      this.clock.clearTimeout(this.shutdownTimer);
       this.shutdownTimer = null;
     }
 

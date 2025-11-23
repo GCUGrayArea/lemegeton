@@ -24,6 +24,7 @@ import { CoordinationSetup } from './coordinationSetup';
 import { StateMachineSetup } from './stateMachineSetup';
 import { HeartbeatMonitor } from './heartbeatMonitor';
 import { mergeConfig } from '../utils/config';
+import { Clock, ProcessHandlers, getSystemClock, getSystemProcessHandlers } from '../utils/testability';
 
 /**
  * Hub configuration
@@ -46,6 +47,10 @@ export interface HubConfig {
     timeout?: number;
     graceful?: boolean;
   };
+  /** Injectable clock for testability (defaults to system clock) */
+  clock?: Clock;
+  /** Injectable process handlers for testability (defaults to system handlers) */
+  processHandlers?: ProcessHandlers;
 }
 
 /**
@@ -104,6 +109,10 @@ export class Hub extends EventEmitter {
   // Shared resources
   private leaseManager: LeaseManager | null = null;
 
+  // Injectable dependencies for testability
+  private clock: Clock;
+  private processHandlers: ProcessHandlers;
+
   // State
   private isRunning: boolean = false;
   private shutdownPromise: Promise<void> | null = null;
@@ -117,6 +126,10 @@ export class Hub extends EventEmitter {
   constructor(config: HubConfig = {}) {
     super();
     this.config = mergeConfig(DEFAULT_HUB_CONFIG, config);
+
+    // Initialize injectable dependencies (defaults to system implementations)
+    this.clock = config.clock ?? getSystemClock();
+    this.processHandlers = config.processHandlers ?? getSystemProcessHandlers();
 
     // Initialize managers
     this.connectionManager = new ConnectionManager({
@@ -290,7 +303,7 @@ export class Hub extends EventEmitter {
       };
 
       this.signalHandlers.set(signal, handler);
-      process.on(signal, handler);
+      this.processHandlers.on(signal, handler);
     }
 
     // Store exception handler
@@ -305,7 +318,7 @@ export class Hub extends EventEmitter {
         process.exit(1);
       }
     };
-    process.on('uncaughtException', this.exceptionHandler);
+    this.processHandlers.onException(this.exceptionHandler);
 
     // Store rejection handler
     this.rejectionHandler = async (reason: unknown, promise: Promise<unknown>) => {
@@ -319,7 +332,7 @@ export class Hub extends EventEmitter {
         process.exit(1);
       }
     };
-    process.on('unhandledRejection', this.rejectionHandler);
+    this.processHandlers.onRejection(this.rejectionHandler);
   }
 
   /**
@@ -331,7 +344,7 @@ export class Hub extends EventEmitter {
       // Remove signal handlers
       for (const [signal, handler] of this.signalHandlers) {
         try {
-          process.off(signal, handler);
+          this.processHandlers.off(signal, handler);
         } catch (error) {
           console.error(`[Hub] Failed to remove signal handler for ${signal}:`, error);
         }
@@ -344,7 +357,7 @@ export class Hub extends EventEmitter {
     try {
       // Remove exception handler
       if (this.exceptionHandler) {
-        process.off('uncaughtException', this.exceptionHandler);
+        this.processHandlers.offException(this.exceptionHandler);
         this.exceptionHandler = null;
       }
     } catch (error) {
@@ -354,7 +367,7 @@ export class Hub extends EventEmitter {
     try {
       // Remove rejection handler
       if (this.rejectionHandler) {
-        process.off('unhandledRejection', this.rejectionHandler);
+        this.processHandlers.offRejection(this.rejectionHandler);
         this.rejectionHandler = null;
       }
     } catch (error) {
