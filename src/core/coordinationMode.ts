@@ -434,7 +434,7 @@ export class CoordinationModeManager extends EventEmitter {
   private async saveState(): Promise<void> {
     const state: CoordinationState = {
       mode: this.currentMode,
-      lastTransition: this.transitionHistory[this.transitionHistory.length - 1] || null,
+      lastTransition: this.transitionHistory[this.transitionHistory.length - 1] ?? null,
       history: this.transitionHistory,
     };
 
@@ -505,7 +505,7 @@ export class CoordinationModeManager extends EventEmitter {
 
         return {
           mode: (mode as CoordinationMode) || CoordinationMode.DISTRIBUTED,
-          lastTransition: history[history.length - 1] || null,
+          lastTransition: history[history.length - 1] ?? null,
           history,
         };
       });

@@ -93,7 +93,7 @@ export class RedisOps {
         if (state) {
           states.set(prId, {
             state: state as HotState,
-            agent_id: agent || undefined,
+            agent_id: agent ?? undefined,
             timestamp: timestamp ? new Date(parseInt(timestamp)) : new Date()
           });
         }

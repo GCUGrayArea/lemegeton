@@ -329,7 +329,7 @@ export class DegradedModeHandler {
   async getCurrentBranch(): Promise<string | null> {
     try {
       const { stdout } = await execAsync('git branch --show-current');
-      return stdout.trim() || null;
+      return stdout.trim() || null; // Keep || here - empty string should return null
     } catch (error) {
       return null;
     }

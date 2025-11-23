@@ -53,7 +53,7 @@ export class PlanningAgent extends BaseAgent {
 
     // Initialize components
     this.promptRunner = new PromptRunner();
-    this.mcpEngine = new MCPQueryEngine(config.mcpClient || null);
+    this.mcpEngine = new MCPQueryEngine(config.mcpClient ?? null);
     this.docGenerator = new DocumentGenerator();
     this.interactive = new InteractiveUI();
     this.scorer = new ComplexityScorer();

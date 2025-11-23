@@ -93,7 +93,7 @@ export class Reconciliation {
         conflicts.push({
           pr_id: prId,
           conflict_type: ConflictType.REDIS_ORPHANED,
-          redis_state: redisHotState?.state || null,
+          redis_state: redisHotState?.state ?? null,
           git_state: null,
           resolution: ConflictResolution.CLEAR_REDIS,
           timestamp: new Date()

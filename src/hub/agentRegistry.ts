@@ -87,7 +87,7 @@ export class AgentRegistry {
             type: (agentData.type || 'worker') as AgentType,
             status: (agentData.status || 'idle') as AgentStatus,
             lastHeartbeat: parseInt(agentData.lastHeartbeat || '0', 10),
-            assignedPR: agentData.assignedPR || null,
+            assignedPR: agentData.assignedPR ?? null,
             pid: parseInt(agentData.pid || '0', 10),
             startedAt: parseInt(agentData.startedAt || '0', 10),
             metadata: agentData.metadata ? JSON.parse(agentData.metadata) : undefined,
@@ -309,7 +309,7 @@ export class AgentRegistry {
    * Get agent by ID
    */
   async getAgent(agentId: string): Promise<AgentInfo | null> {
-    return this.agents.get(agentId) || null;
+    return this.agents.get(agentId) ?? null;
   }
 
   /**

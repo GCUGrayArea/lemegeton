@@ -362,11 +362,11 @@ export class RedisPubSub extends EventEmitter implements IMessageTransport {
       timestamp: parseInt(data.timestamp, 10),
       type: data.type,
       from: data.from,
-      to: data.to || undefined,
+      to: data.to ?? undefined,
       payload: JSON.parse(data.payload),
       priority: data.priority ? parseInt(data.priority, 10) : undefined,
       ttl: data.ttl ? parseInt(data.ttl, 10) : undefined,
-      correlationId: data.correlationId || undefined,
+      correlationId: data.correlationId ?? undefined,
     };
   }
 

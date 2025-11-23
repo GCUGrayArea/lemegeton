@@ -368,15 +368,16 @@ export class MCPClient extends EventEmitter {
     // etc.
 
     if (toolName.startsWith('github')) {
-      return this.servers.get('github') || null;
+      return this.servers.get('github') ?? null;
     } else if (toolName.startsWith('npm')) {
-      return this.servers.get('npm') || null;
+      return this.servers.get('npm') ?? null;
     } else if (toolName.startsWith('mdn')) {
-      return this.servers.get('mdn') || null;
+      return this.servers.get('mdn') ?? null;
     }
 
     // Try first available server as fallback
-    return Array.from(this.servers.values())[0] || null;
+    const servers = Array.from(this.servers.values());
+    return servers.length > 0 ? servers[0] : null;
   }
 
   /**

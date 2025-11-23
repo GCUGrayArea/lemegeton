@@ -127,7 +127,7 @@ export class DaemonManager {
     const running = await this.isRunning();
     if (running) {
       const pid = await this.readPidFile();
-      return { running, pid: pid || undefined };
+      return { running, pid: pid ?? undefined };
     }
     return { running: false };
   }
