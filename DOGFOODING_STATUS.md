@@ -110,6 +110,42 @@ Implemented full code generation workflow for WorkerAgent.
    - Non-zero exit codes trigger work failure
    - Build output included in error messages
 
+### Phase 1D: OAuth Token Support (Option B)
+
+Implemented OAuth token authentication to unblock testing without API keys.
+
+#### Key Implementations
+
+1. **AnthropicClient OAuth Support** (`src/llm/AnthropicClient.ts`)
+   - Accepts either `apiKey` or `oauthToken` in constructor
+   - Uses `Bearer {token}` auth header for OAuth tokens
+   - Uses `x-api-key` header for API keys
+   - Validates that at least one auth method is provided
+
+2. **WorkerAgent Authentication** (`src/agents/worker.ts`)
+   - Checks both `ANTHROPIC_API_KEY` and `CLAUDE_CODE_OAUTH_TOKEN` env vars
+   - Clear error messages directing users to `claude setup-token`
+   - Passes auth credentials to AnthropicClient constructor
+
+3. **AgentSpawner Logging** (`src/hub/agentSpawner.ts`)
+   - Logs which auth method is being used (with redaction)
+   - Helps debug auth issues without exposing tokens
+   - Warns if no auth credentials found
+
+#### Usage
+
+```bash
+# Generate OAuth token
+export CLAUDE_CODE_OAUTH_TOKEN=$(claude setup-token)
+
+# Run WorkerAgent with OAuth
+npx lemegeton run PR-XXX
+```
+
+#### Status
+
+**READY FOR VALIDATION** - Implementation complete, needs end-to-end testing
+
 #### Bug Fixes
 
 1. **TypeScript Compilation** - Installed missing `@types/node` package
@@ -161,8 +197,9 @@ npx lemegeton run PR-017
 **Current Status:** ✅ **ALL WORKING**
 
 ### Known Issues
-- ⚠️ **CRITICAL: Authentication Blocker** - WorkerAgent requires `ANTHROPIC_API_KEY` environment variable, but user only has Claude Code session auth. Spawned child processes cannot access parent OAuth token.
+- 🧪 **IN TESTING: Authentication** - Option B (OAuth token passing) implemented. WorkerAgent now supports both `ANTHROPIC_API_KEY` and `CLAUDE_CODE_OAUTH_TOKEN`. Ready for validation testing.
 - ⚠️ QCAgent.doWork() is stubbed (no test execution yet)
+- 📝 **TODO: Long-term auth architecture** - After validation, need to decide between Option A (Claude Code subagents) vs Option C (MCP bridge) to preserve tool-agnosticism
 
 ---
 
@@ -275,15 +312,49 @@ Claude Code Session (has OAuth)
 
 ### Recommendation
 
-**Short-term:** Option B (OAuth token passing)
+**Short-term:** Option B (OAuth token passing) ✅ **IMPLEMENTED**
 - Unblocks testing immediately
 - Minimal code changes
 - Proves the concept end-to-end
+- **STATUS**: Code complete, ready for validation testing
 
-**Long-term:** Option A (Subagent refactor)
-- Better Claude Code integration
-- Aligns with how task-master and other tools work
-- Plugin distribution is more user-friendly
+**Validation Plan:**
+1. Test WorkerAgent with `CLAUDE_CODE_OAUTH_TOKEN` on a simple PR
+2. Verify end-to-end coordination: planning → implementation → build
+3. Validate that all agent communication and state management works
+4. **After validation succeeds**, decide on long-term architecture
+
+**Long-term Decision (Post-Validation):**
+
+Need to choose between:
+- **Option A (Subagents)**: Better Claude Code integration, but couples to single tool
+- **Option C (MCP Bridge)**: Hybrid approach, more flexible but more complex
+
+**Tool-Agnosticism Research:**
+
+To maintain provider-agnosticism, investigated CLI auth for major tools:
+
+| Tool | Auth Method | Environment Variable | OAuth CLI Support |
+|------|-------------|---------------------|-------------------|
+| **Claude Code** | API Key or OAuth | `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN` | ✅ Yes (`claude setup-token`) |
+| **Cursor** | API Key or Browser OAuth | `CURSOR_API_KEY` | ✅ Yes (`cursor-agent login`) |
+| **GitHub Copilot** | GitHub OAuth | `COPILOT_GITHUB_TOKEN` or `GH_TOKEN` | ✅ Yes (via `gh` CLI) |
+| **OpenAI** | API Key | `OPENAI_API_KEY` | ❌ No OAuth CLI (API keys only) |
+
+**Conclusion**: All major tools support API key authentication. OAuth token CLI support varies:
+- Claude Code, Cursor, and Copilot all have OAuth mechanisms
+- But each uses different patterns (setup-token vs browser login vs gh extension)
+- **API keys remain the most portable option** across all tools
+- Option C (MCP Bridge) could abstract over different auth methods per tool
+
+**Recommended Path:**
+1. Validate Option B with Claude Code
+2. If validation succeeds, implement Option C (MCP Bridge)
+   - MCP server handles tool-specific auth
+   - Agent code stays tool-agnostic
+   - Can support Claude Code, Cursor, Copilot, and OpenAI simultaneously
+3. Document API key requirements as primary auth method
+4. OAuth support remains optional enhancement per tool
 
 ---
 
@@ -291,25 +362,25 @@ Claude Code Session (has OAuth)
 
 ### Critical Path (Blockers)
 
-1. **Resolve Authentication Issue** ⚠️ BLOCKER
-   - Current: WorkerAgent cannot run without `ANTHROPIC_API_KEY`
-   - Needed: Choose and implement auth solution (see options above)
-   - Recommended: Start with Option B (OAuth token passing) for immediate unblocking
-   - Tracks: Can't test WorkerAgent until resolved
+1. **Validate Authentication Solution** 🧪 IN TESTING
+   - Status: Option B (OAuth token passing) implemented
+   - Next: Test with `export CLAUDE_CODE_OAUTH_TOKEN=$(claude setup-token)`
+   - Goal: Validate coordination core works end-to-end
+   - After validation: Decide on Option A vs C for long-term architecture
 
 ### High Priority
 
-2. **WorkerAgent.doWork()** ✅ IMPLEMENTED (auth-blocked)
+2. **WorkerAgent.doWork()** ✅ IMPLEMENTED (ready for validation)
    - Location: `src/agents/worker.ts`
-   - Status: **Implementation complete**, cannot test without auth
+   - Status: **Implementation complete**, ready for validation testing
    - Features implemented:
      - ✅ Read PRD from `docs/plans/`
-     - ✅ Use Claude API to generate code
+     - ✅ Use Claude API to generate code (with OAuth support)
      - ✅ Structured JSON response format (create/modify/delete)
      - ✅ Create/modify files based on plan
      - ✅ Run build to verify TypeScript compiles
      - ✅ Update PR state to 'implemented'
-   - Blocked by: Authentication issue (#1 above)
+   - Next: Validate with real PR using OAuth token
 
 3. **Implement QCAgent.doWork()**
    - Location: `src/agents/qc.ts`
