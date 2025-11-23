@@ -10,11 +10,10 @@ import { ParsedTaskList, PRData, TaskListMetadata, ValidationResult } from './ty
 import { extractFrontmatter, reconstructDocument, addPRBlock } from './frontmatter';
 import { validatePR, validateTaskList } from './validation';
 import { FileError, ValidationError } from './errors';
+import { SimpleCache } from '../utils/cache';
 
 export class TaskListParser {
-  private cache: Map<string, ParsedTaskList> = new Map();
-  private cacheTimestamps: Map<string, number> = new Map();
-  private cacheTTL: number = 30000; // 30 seconds
+  private cache = new SimpleCache<string, ParsedTaskList>({ ttl: 30000 });
 
   /**
    * Parse a task list file
@@ -22,7 +21,7 @@ export class TaskListParser {
   async parse(filePath: string, useCache: boolean = true): Promise<ParsedTaskList> {
     // Check cache
     if (useCache) {
-      const cached = this.getFromCache(filePath);
+      const cached = this.cache.get(filePath);
       if (cached) {
         return cached;
       }
@@ -67,7 +66,6 @@ export class TaskListParser {
     // Cache result
     if (useCache) {
       this.cache.set(filePath, result);
-      this.cacheTimestamps.set(filePath, Date.now());
     }
 
     return result;
@@ -212,30 +210,6 @@ export class TaskListParser {
     }
 
     return metadata;
-  }
-
-  /**
-   * Get from cache if valid
-   */
-  private getFromCache(filePath: string): ParsedTaskList | null {
-    const cached = this.cache.get(filePath);
-    if (!cached) {
-      return null;
-    }
-
-    const timestamp = this.cacheTimestamps.get(filePath);
-    if (!timestamp) {
-      return null;
-    }
-
-    const age = Date.now() - timestamp;
-    if (age > this.cacheTTL) {
-      this.cache.delete(filePath);
-      this.cacheTimestamps.delete(filePath);
-      return null;
-    }
-
-    return cached;
   }
 
   /**

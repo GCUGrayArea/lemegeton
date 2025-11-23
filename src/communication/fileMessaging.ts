@@ -16,6 +16,7 @@ import {
   MessageBusConfig,
   DEFAULT_MESSAGE_BUS_CONFIG,
 } from './types';
+import { mergeConfig } from '../utils/config';
 
 /**
  * File-based messaging transport implementation
@@ -41,7 +42,7 @@ export class FileMessaging extends EventEmitter implements IMessageTransport {
 
   constructor(config: MessageBusConfig = {}) {
     super();
-    this.config = { ...DEFAULT_MESSAGE_BUS_CONFIG, ...config };
+    this.config = mergeConfig(DEFAULT_MESSAGE_BUS_CONFIG, config);
     this.baseDir = this.config.fileMessagingDir;
     this.pollingInterval = this.config.pollingInterval;
   }

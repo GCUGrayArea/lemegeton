@@ -5,6 +5,37 @@
 import { Priority, ColdState } from '../types/pr';
 
 /**
+ * Agent statistics
+ */
+export interface AgentStats {
+  agentId: string;
+  agentType: string;
+  state: AgentState;
+  uptime: number;
+  currentPR: string | null;
+  heartbeat: HeartbeatStats;
+  recovery: RecoveryStats;
+}
+
+/**
+ * Heartbeat statistics
+ */
+export interface HeartbeatStats {
+  lastSent: number;
+  lastAck: number;
+  missedAcks: number;
+  isAlive: boolean;
+  timeSinceLastAck: number;
+}
+
+/**
+ * Recovery statistics
+ */
+export interface RecoveryStats {
+  retryAttempts: Map<string, number>;
+}
+
+/**
  * Agent state during lifecycle
  */
 export enum AgentState {

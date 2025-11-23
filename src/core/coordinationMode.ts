@@ -14,6 +14,8 @@ import { RedisClient, RedisConnectionState } from '../redis/client';
 import { RedisHealthChecker, HealthStatus } from '../redis/health';
 import { DegradedModeHandler } from './degradedMode';
 import { IsolatedModeHandler } from './isolatedMode';
+import { CoordinationError, wrapError, ErrorCode } from '../types';
+import { mergeConfig } from '../utils/config';
 
 /**
  * Coordination modes
@@ -99,7 +101,7 @@ export class CoordinationModeManager extends EventEmitter {
     super();
     this.redisClient = redisClient;
     this.healthChecker = healthChecker;
-    this.config = { ...DEFAULT_COORDINATION_CONFIG, ...config };
+    this.config = mergeConfig(DEFAULT_COORDINATION_CONFIG, config);
     this.degradedHandler = new DegradedModeHandler(this.config);
     this.isolatedHandler = new IsolatedModeHandler(this.config);
 
@@ -207,7 +209,17 @@ export class CoordinationModeManager extends EventEmitter {
     // Check cooldown period
     const now = Date.now();
     if (now - this.lastTransitionTime < this.config.transitionCooldown) {
-      this.emit('transitionFailed', new Error('Transition cooldown active'));
+      const cooldownError = CoordinationError.transitionFailed(
+        this.currentMode,
+        newMode,
+        'Transition cooldown active',
+        {
+          lastTransitionTime: this.lastTransitionTime,
+          cooldownMs: this.config.transitionCooldown,
+          timeSinceLastMs: now - this.lastTransitionTime,
+        }
+      );
+      this.emit('transitionFailed', cooldownError);
       return;
     }
 
@@ -239,10 +251,20 @@ export class CoordinationModeManager extends EventEmitter {
       this.emit('transitionComplete', newMode);
 
       console.log(`[CoordinationMode] Switched from ${from} to ${newMode}: ${reason}`);
-    } catch (error: any) {
-      this.emit('transitionFailed', error);
+    } catch (error: unknown) {
+      const transitionError = CoordinationError.transitionFailed(
+        from,
+        newMode,
+        error instanceof Error ? error.message : String(error),
+        {
+          reason,
+          timestamp: now,
+        },
+        error instanceof Error ? error : undefined
+      );
+      this.emit('transitionFailed', transitionError);
       console.error(`[CoordinationMode] Failed to switch from ${from} to ${newMode}:`, error);
-      throw error;
+      throw transitionError;
     }
   }
 

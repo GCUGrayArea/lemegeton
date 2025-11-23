@@ -25,6 +25,7 @@ import {
   PairedLockingConfig,
   DEFAULT_PAIRED_LOCKING_CONFIG,
 } from './pairedLocking';
+import { mergeConfig } from '../utils/config';
 
 /**
  * Lease acquisition result
@@ -84,6 +85,18 @@ export interface LeaseManagerEvents {
 }
 
 /**
+ * Default lease manager configuration
+ */
+export const DEFAULT_LEASE_MANAGER_CONFIG: Required<LeaseManagerConfig> = {
+  defaultTTL: 300,
+  heartbeatInterval: 120000,
+  gracePeriod: 30,
+  pairedLocking: DEFAULT_PAIRED_LOCKING_CONFIG,
+  trackSets: true,
+  maxFilesPerRequest: 100,
+};
+
+/**
  * File lease manager
  */
 export class LeaseManager extends EventEmitter {
@@ -97,17 +110,7 @@ export class LeaseManager extends EventEmitter {
   ) {
     super();
 
-    this.config = {
-      defaultTTL: config.defaultTTL ?? 300,
-      heartbeatInterval: config.heartbeatInterval ?? 120000,
-      gracePeriod: config.gracePeriod ?? 30,
-      pairedLocking: {
-        ...DEFAULT_PAIRED_LOCKING_CONFIG,
-        ...config.pairedLocking,
-      },
-      trackSets: config.trackSets ?? true,
-      maxFilesPerRequest: config.maxFilesPerRequest ?? 100,
-    };
+    this.config = mergeConfig(DEFAULT_LEASE_MANAGER_CONFIG, config);
   }
 
   /**

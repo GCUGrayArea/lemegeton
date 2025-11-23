@@ -8,6 +8,7 @@
 import { createClient, RedisClientType, RedisFunctions, RedisModules, RedisScripts } from 'redis';
 import { EventEmitter } from 'events';
 import { getConfig, getRedisUrl } from '../config';
+import { RedisError, ErrorCode } from '../types';
 
 /**
  * Type alias for the Redis client
@@ -75,7 +76,10 @@ export class RedisClient extends EventEmitter {
    */
   public getClient(): LemegetonRedisClient {
     if (!this.client || !this.isConnected()) {
-      throw new Error('Redis client not connected');
+      throw RedisError.connectionFailed(this.url, {
+        state: this.state,
+        operation: 'getClient',
+      });
     }
     return this.client;
   }
@@ -85,7 +89,10 @@ export class RedisClient extends EventEmitter {
    */
   public getPubClient(): LemegetonRedisClient {
     if (!this.pubClient || !this.isConnected()) {
-      throw new Error('Redis pub client not connected');
+      throw RedisError.connectionFailed(this.url, {
+        state: this.state,
+        operation: 'getPubClient',
+      });
     }
     return this.pubClient;
   }
@@ -95,7 +102,10 @@ export class RedisClient extends EventEmitter {
    */
   public getSubClient(): LemegetonRedisClient {
     if (!this.subClient || !this.isConnected()) {
-      throw new Error('Redis sub client not connected');
+      throw RedisError.connectionFailed(this.url, {
+        state: this.state,
+        operation: 'getSubClient',
+      });
     }
     return this.subClient;
   }
@@ -124,7 +134,14 @@ export class RedisClient extends EventEmitter {
    */
   private createRedisClient(): LemegetonRedisClient {
     const config = getConfig();
-    const retryConfig = config.redis.retry;
+
+    // Resolve retry configuration with defaults
+    const retryConfig = {
+      maxAttempts: config.redis.retry?.maxAttempts ?? 10,
+      initialDelay: config.redis.retry?.initialDelay ?? 1000,
+      maxDelay: config.redis.retry?.maxDelay ?? 30000,
+      factor: config.redis.retry?.factor ?? 2,
+    };
 
     const client = createClient({
       url: this.url,
@@ -137,7 +154,7 @@ export class RedisClient extends EventEmitter {
           }
 
           // Check max attempts
-          if (retries >= retryConfig!.maxAttempts!) {
+          if (retries >= retryConfig.maxAttempts) {
             this.setState(RedisConnectionState.ERROR);
             this.emit('error', new Error(`Failed to connect after ${retries} attempts`));
             return false;
@@ -145,8 +162,8 @@ export class RedisClient extends EventEmitter {
 
           // Calculate delay with exponential backoff
           const delay = Math.min(
-            retryConfig!.initialDelay! * Math.pow(retryConfig!.factor!, retries),
-            retryConfig!.maxDelay!
+            retryConfig.initialDelay * Math.pow(retryConfig.factor, retries),
+            retryConfig.maxDelay
           );
 
           this.reconnectAttempt = retries + 1;
@@ -363,29 +380,5 @@ export class RedisClient extends EventEmitter {
   }
 }
 
-/**
- * Singleton Redis client instance
- */
-let defaultClient: RedisClient | null = null;
-
-/**
- * Gets or creates the default Redis client
- */
-export function getDefaultRedisClient(): RedisClient {
-  if (!defaultClient) {
-    defaultClient = new RedisClient();
-  }
-  return defaultClient;
-}
-
-/**
- * Resets the default client (mainly for testing)
- */
-export function resetDefaultRedisClient(): void {
-  if (defaultClient) {
-    defaultClient.disconnect().catch(() => {
-      // Ignore errors during reset
-    });
-    defaultClient = null;
-  }
-}
+// Singleton pattern removed - use dependency injection instead
+// Create RedisClient instances explicitly and pass them to components that need them

@@ -4,6 +4,7 @@
 
 import { EventEmitter } from 'events';
 import { ErrorCategory, ErrorInfo } from './types';
+import { mergeConfig } from '../utils/config';
 
 export type RecoveryAction =
   | { action: 'retry'; delay: number }
@@ -29,7 +30,7 @@ export class RecoveryManager extends EventEmitter {
 
   constructor(config: Partial<RecoveryConfig> = {}) {
     super();
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.config = mergeConfig(DEFAULT_CONFIG, config);
   }
 
   /**

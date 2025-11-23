@@ -6,6 +6,8 @@
  * configuration, no API keys or secrets are handled here.
  */
 
+import { mergeConfig } from '../utils/config';
+
 /**
  * Redis connection configuration
  */
@@ -250,12 +252,5 @@ export function validateConfig(config: unknown): string[] {
  * @returns Complete configuration with defaults
  */
 export function mergeWithDefaults(config: LemegetonConfig): Required<LemegetonConfig> {
-  return {
-    redis: { ...DEFAULT_CONFIG.redis, ...config.redis },
-    docker: { ...DEFAULT_CONFIG.docker, ...config.docker },
-    hub: { ...DEFAULT_CONFIG.hub, ...config.hub },
-    agent: { ...DEFAULT_CONFIG.agent, ...config.agent },
-    environment: config.environment ?? DEFAULT_CONFIG.environment,
-    logLevel: config.logLevel ?? DEFAULT_CONFIG.logLevel,
-  };
+  return mergeConfig(DEFAULT_CONFIG, config);
 }

@@ -7,6 +7,7 @@
 
 import { PRNode, Assignment, Priority, WorkType } from './types';
 import { AgentInfo, AgentType } from '../hub/agentRegistry';
+import { mergeConfig } from '../utils/config';
 
 /**
  * Agent capability profile
@@ -81,7 +82,7 @@ export class AssignmentManager {
   private roundRobinIndex = 0;
 
   constructor(config: AssignmentConfig = {}) {
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.config = mergeConfig(DEFAULT_CONFIG, config);
     this.initializeDefaultCapabilities();
   }
 

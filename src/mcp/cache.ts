@@ -2,25 +2,29 @@
  * MCP Cache
  *
  * Caching layer for MCP responses with TTL and size limits.
+ * Uses TTLCache internally for consistent cache behavior.
  */
 
 import { MCPCacheConfig, MCPCacheEntry, MCPRequest } from './types';
+import { TTLCache } from '../utils/cache';
 
 /**
  * Cache implementation for MCP responses
  */
 export class MCPCache {
-  private memoryCache: Map<string, MCPCacheEntry>;
-  private totalSize: number = 0;
+  private cache: TTLCache<string, MCPCacheEntry>;
   private config: MCPCacheConfig;
-  private cleanupInterval: NodeJS.Timeout | null = null;
 
   constructor(config?: MCPCacheConfig) {
     this.config = config || this.getDefaultConfig();
-    this.memoryCache = new Map();
 
-    // Periodic cleanup
-    this.cleanupInterval = setInterval(() => this.cleanup(), 60000); // Every minute
+    // Initialize TTLCache with size tracking enabled
+    this.cache = new TTLCache({
+      defaultTTL: this.config.ttl.default * 1000, // Convert seconds to ms
+      maxEntries: 1000, // Reasonable limit for number of entries
+      maxSize: this.config.maxSize,
+      cleanupInterval: 60000, // 1 minute cleanup interval
+    });
   }
 
   /**
@@ -32,20 +36,13 @@ export class MCPCache {
     }
 
     const key = this.generateKey(request);
-    const entry = this.memoryCache.get(key);
+    const entry = this.cache.get(key);
 
     if (!entry) {
       return null;
     }
 
-    // Check if expired
-    const age = (Date.now() - entry.timestamp) / 1000; // in seconds
-    if (age > entry.ttl) {
-      this.memoryCache.delete(key);
-      this.totalSize -= entry.size;
-      return null;
-    }
-
+    // Return the full entry (which includes timestamp, ttl, size, data)
     return entry as MCPCacheEntry<T>;
   }
 
@@ -67,11 +64,7 @@ export class MCPCache {
       return;
     }
 
-    // Evict entries if needed
-    while (this.totalSize + size > this.config.maxSize) {
-      this.evictOldest();
-    }
-
+    // Create cache entry with metadata
     const entry: MCPCacheEntry = {
       data,
       timestamp: Date.now(),
@@ -79,8 +72,9 @@ export class MCPCache {
       size,
     };
 
-    this.memoryCache.set(key, entry);
-    this.totalSize += size;
+    // Store entry with TTL in milliseconds
+    // Pass size explicitly so TTLCache can track total size
+    this.cache.set(key, entry, ttl * 1000, size);
   }
 
   /**
@@ -88,26 +82,14 @@ export class MCPCache {
    */
   async invalidate(request: MCPRequest): Promise<void> {
     const key = this.generateKey(request);
-    const entry = this.memoryCache.get(key);
-
-    if (entry) {
-      this.memoryCache.delete(key);
-      this.totalSize -= entry.size;
-    }
+    this.cache.delete(key);
   }
 
   /**
    * Clear entire cache
    */
   async clear(): Promise<void> {
-    this.memoryCache.clear();
-    this.totalSize = 0;
-
-    // Stop cleanup interval
-    if (this.cleanupInterval) {
-      clearInterval(this.cleanupInterval);
-      this.cleanupInterval = null;
-    }
+    this.cache.destroy();
   }
 
   /**
@@ -119,11 +101,13 @@ export class MCPCache {
     maxSize: number;
     utilizationPercent: number;
   } {
+    const stats = this.cache.getStats();
+
     return {
-      entries: this.memoryCache.size,
-      totalSize: this.totalSize,
-      maxSize: this.config.maxSize,
-      utilizationPercent: (this.totalSize / this.config.maxSize) * 100,
+      entries: stats.entries,
+      totalSize: stats.totalSize ?? 0,
+      maxSize: stats.maxSize ?? this.config.maxSize,
+      utilizationPercent: stats.utilizationPercent ?? 0,
     };
   }
 
@@ -138,7 +122,7 @@ export class MCPCache {
   }
 
   /**
-   * Get TTL for a tool
+   * Get TTL for a tool (in seconds)
    */
   private getTTL(tool: string): number {
     if (tool.startsWith('github')) {
@@ -154,55 +138,18 @@ export class MCPCache {
 
   /**
    * Calculate approximate size of data in bytes
+   *
+   * Note: Uses string length approximation instead of Blob API
+   * for Node.js compatibility. Provides reasonable estimates.
    */
   private calculateSize(data: any): number {
-    const json = JSON.stringify(data);
-    return new Blob([json]).size;
-  }
-
-  /**
-   * Evict oldest entry
-   */
-  private evictOldest(): void {
-    let oldestKey: string | null = null;
-    let oldestTime = Infinity;
-
-    for (const [key, entry] of this.memoryCache.entries()) {
-      if (entry.timestamp < oldestTime) {
-        oldestTime = entry.timestamp;
-        oldestKey = key;
-      }
-    }
-
-    if (oldestKey) {
-      const entry = this.memoryCache.get(oldestKey);
-      if (entry) {
-        this.memoryCache.delete(oldestKey);
-        this.totalSize -= entry.size;
-      }
-    }
-  }
-
-  /**
-   * Clean up expired entries
-   */
-  private cleanup(): void {
-    const now = Date.now();
-    const toDelete: string[] = [];
-
-    for (const [key, entry] of this.memoryCache.entries()) {
-      const age = (now - entry.timestamp) / 1000;
-      if (age > entry.ttl) {
-        toDelete.push(key);
-      }
-    }
-
-    for (const key of toDelete) {
-      const entry = this.memoryCache.get(key);
-      if (entry) {
-        this.memoryCache.delete(key);
-        this.totalSize -= entry.size;
-      }
+    try {
+      const json = JSON.stringify(data);
+      // Approximate size: 2 bytes per character in UTF-16
+      return json.length * 2;
+    } catch {
+      // If data can't be stringified, use default size
+      return 1024; // 1KB default
     }
   }
 
