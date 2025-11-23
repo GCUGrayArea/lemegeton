@@ -74,6 +74,42 @@ Successfully implemented daemon mode for distributed/team scenarios.
    - Scheduler initializes with current runtime states
    - Prevents stale state issues
 
+### Phase 1C: WorkerAgent Implementation
+
+Implemented full code generation workflow for WorkerAgent.
+
+#### Key Implementations
+
+1. **WorkerAgent Code Generation** (`src/agents/worker.ts`)
+   - Reads PRD files from `docs/plans/` directory
+   - Fetches PR metadata from Redis (`state:prs` key)
+   - Calls Claude API to generate implementation
+   - Uses structured JSON response format for file operations
+   - Supports create/modify/delete file actions
+   - Writes generated code to disk
+   - Runs `npm run build` to verify TypeScript compilation
+   - Updates PR state to 'implemented' upon success
+   - Reports progress at each stage (10%, 20%, 60%, 80%, 90%, 100%)
+
+2. **LLM Integration** (`src/llm/AnthropicClient.ts`)
+   - Already implemented, supports Claude API calls
+   - Model selection based on PR complexity (haiku/sonnet/opus)
+   - Configurable temperature and token limits
+   - Proper error handling for API failures
+
+3. **File Operations**
+   - Directory creation with `recursive: true`
+   - UTF-8 file encoding
+   - Atomic file writes (create/modify)
+   - File deletion support
+   - Error handling for filesystem operations
+
+4. **Build Verification**
+   - Spawns `npm run build` as child process
+   - Captures stdout/stderr for error reporting
+   - Non-zero exit codes trigger work failure
+   - Build output included in error messages
+
 #### Bug Fixes
 
 1. **TypeScript Compilation** - Installed missing `@types/node` package
@@ -125,28 +161,157 @@ npx lemegeton run PR-017
 **Current Status:** ✅ **ALL WORKING**
 
 ### Known Issues
-- ⚠️ WorkerAgent.doWork() is stubbed (no real code generation yet)
+- ⚠️ **CRITICAL: Authentication Blocker** - WorkerAgent requires `ANTHROPIC_API_KEY` environment variable, but user only has Claude Code session auth. Spawned child processes cannot access parent OAuth token.
 - ⚠️ QCAgent.doWork() is stubbed (no test execution yet)
+
+---
+
+## 🚧 Authentication Blocker & Solutions
+
+### The Problem
+
+WorkerAgent is fully implemented but **cannot be tested** due to authentication requirements:
+
+**Current Architecture:**
+- Agents spawned as **child processes** via `child_process.spawn()` (`src/hub/agentSpawner.ts`)
+- Child processes are **isolated** from parent Claude Code session
+- WorkerAgent calls `new AnthropicClient({ apiKey })` which requires `ANTHROPIC_API_KEY` env var
+- User has Claude Code session (OAuth) but **no API key**
+
+**Impact:**
+- Cannot test WorkerAgent code generation
+- Cannot dogfood PR implementation
+- Blocks end-to-end workflow (new → planned → **implemented** → testing → done)
+
+### Research Findings
+
+Investigated [claude-task-master](https://github.com/eyaltoledano/claude-task-master) integration approach:
+
+**Key Discoveries:**
+1. **Claude Code Plugins** can bundle MCP servers that inherit parent session auth
+2. **Subagents** (not child processes) automatically inherit parent authentication
+3. `CLAUDE_CODE_OAUTH_TOKEN` can be passed to child processes via env vars
+4. Plugins don't require separate API keys when running in Claude Code
+
+### Solution Options
+
+#### Option A: Refactor to Claude Code Subagents (Recommended)
+**Approach:** Rebuild agents as Claude Code subagents instead of child processes
+
+**Pros:**
+- Automatic auth inheritance (no API key needed)
+- Native Claude Code integration
+- Can distribute as plugin for easy installation
+- Better resource management (Claude manages lifecycle)
+
+**Cons:**
+- Significant architecture change (ProcessManager → Subagent API)
+- Tighter coupling to Claude Code (less provider-agnostic)
+- Must learn Claude Code subagent SDK
+
+**Effort:** High (1-2 weeks)
+
+#### Option B: Pass OAuth Token to Child Processes
+**Approach:** Use `CLAUDE_CODE_OAUTH_TOKEN` env var for spawned agents
+
+**Implementation:**
+```bash
+# Parent session generates token
+export CLAUDE_CODE_OAUTH_TOKEN=$(claude setup-token)
+
+# Pass to child process
+CLAUDE_CODE_OAUTH_TOKEN=$CLAUDE_CODE_OAUTH_TOKEN node dist/agents/worker.js
+```
+
+**Pros:**
+- Minimal code changes
+- Keeps current architecture
+- Provider-agnostic (can support other OAuth providers)
+
+**Cons:**
+- Requires user to run `claude setup-token` manually
+- Token management complexity (expiration, rotation)
+- Not documented as official pattern
+
+**Effort:** Low (1-2 days)
+
+#### Option C: Hybrid - MCP Server Bridge
+**Approach:** Create Claude Code plugin with MCP server that calls agent logic
+
+**Architecture:**
+```
+Claude Code Session (has OAuth)
+  → Plugin MCP Server (inherits auth)
+    → Calls WorkerAgent logic in-process
+      → Uses parent session credentials
+```
+
+**Pros:**
+- Keeps agent implementation logic intact
+- Plugin benefits (easy distribution, auth inheritance)
+- Can still support standalone mode with API keys
+
+**Cons:**
+- Two execution modes to maintain (plugin vs standalone)
+- MCP server development overhead
+- More complex deployment
+
+**Effort:** Medium (3-5 days)
+
+#### Option D: Require API Key (Current State)
+**Approach:** Document that users need `ANTHROPIC_API_KEY` to use Lemegeton
+
+**Pros:**
+- No code changes needed
+- Clear, simple authentication model
+- Provider-agnostic
+
+**Cons:**
+- Blocks current user from testing (no API key)
+- Can't leverage Claude Code subscription for dogfooding
+- Additional cost barrier for users with subscriptions
+
+**Effort:** None (documentation only)
+
+### Recommendation
+
+**Short-term:** Option B (OAuth token passing)
+- Unblocks testing immediately
+- Minimal code changes
+- Proves the concept end-to-end
+
+**Long-term:** Option A (Subagent refactor)
+- Better Claude Code integration
+- Aligns with how task-master and other tools work
+- Plugin distribution is more user-friendly
 
 ---
 
 ## 📋 TODO: Remaining Work for Dogfooding
 
+### Critical Path (Blockers)
+
+1. **Resolve Authentication Issue** ⚠️ BLOCKER
+   - Current: WorkerAgent cannot run without `ANTHROPIC_API_KEY`
+   - Needed: Choose and implement auth solution (see options above)
+   - Recommended: Start with Option B (OAuth token passing) for immediate unblocking
+   - Tracks: Can't test WorkerAgent until resolved
+
 ### High Priority
 
-1. **Implement WorkerAgent.doWork()**
+2. **WorkerAgent.doWork()** ✅ IMPLEMENTED (auth-blocked)
    - Location: `src/agents/worker.ts`
-   - Current: Stub implementation (simulation only)
-   - Needed: Actual code implementation
-   - Should:
-     - Read PRD from `docs/plans/`
-     - Use Claude API to generate code
-     - Guide implementation with prompts from memory bank
-     - Create/modify files based on plan
-     - Run build to verify TypeScript compiles
-     - Update PR state to 'implemented'
+   - Status: **Implementation complete**, cannot test without auth
+   - Features implemented:
+     - ✅ Read PRD from `docs/plans/`
+     - ✅ Use Claude API to generate code
+     - ✅ Structured JSON response format (create/modify/delete)
+     - ✅ Create/modify files based on plan
+     - ✅ Run build to verify TypeScript compiles
+     - ✅ Update PR state to 'implemented'
+   - Blocked by: Authentication issue (#1 above)
 
-2. **Implement QCAgent.doWork()**
+3. **Implement QCAgent.doWork()**
    - Location: `src/agents/qc.ts`
    - Current: Stub implementation
    - Needed: Test execution and validation
@@ -156,13 +321,6 @@ npx lemegeton run PR-017
      - Report pass/fail status
      - Update PR state based on results
      - Handle test failures gracefully
-
-3. **Change Planning Agent Output Format to YAML** (Optional Enhancement)
-   - Location: `src/agents/planning.ts` - `generatePlan()` method
-   - Current: Generates Markdown PRD files
-   - Optional: Generate structured YAML instead for easier parsing
-   - Rationale: Markdown is fragile and hard to parse reliably
-   - Note: Can defer until we see if WorkerAgent needs this
 
 ### Medium Priority
 
@@ -178,31 +336,32 @@ npx lemegeton run PR-017
    - Timeout handling improvements
    - Retry logic for transient failures
 
-6. **Claude API Integration**
-   - Set up API key configuration
-   - Implement rate limiting
-   - Handle API errors gracefully
-   - Support model selection (haiku/sonnet/opus)
-
 ### Low Priority
 
-7. **PRD Template Improvements**
+6. **PRD Template Improvements**
    - Add rationale sections
    - Include acceptance criteria
    - Reference related PRs/docs
    - Add architectural decision records
 
-8. **Progress Reporting**
+7. **Progress Reporting**
    - More granular progress updates during work
    - Estimated time remaining
    - File-by-file progress for large PRs
    - Live streaming of agent output
 
-9. **Cost Tracking Integration**
+8. **Cost Tracking Integration**
    - Track API costs during agent work
    - Enforce cost limits from PR complexity
    - Report costs in work results
    - Budget warnings and hard limits
+
+9. **Change Planning Agent Output Format to YAML** (Optional Enhancement)
+   - Location: `src/agents/planning.ts` - `generatePlan()` method
+   - Current: Generates Markdown PRD files
+   - Optional: Generate structured YAML instead for easier parsing
+   - Rationale: Markdown is fragile and hard to parse reliably
+   - Note: Can defer until we see if WorkerAgent needs this
 
 ---
 
@@ -237,12 +396,16 @@ redis-cli
 ## 📁 Key Files Modified
 
 ### Core Implementation
-- `src/hub/index.ts` - Hub components integration
-- `src/cli/hubClient.ts` - In-process mode and assignment delivery
+- `src/hub/index.ts` - Hub components integration, daemon work request handling
+- `src/hub/startup.ts` - State synchronization, Redis preservation across restarts
+- `src/scheduler/index.ts` - getPRNode() method for dependency graph access
+- `src/cli/hubClient.ts` - In-process mode, daemon mode routing, assignment delivery
 - `src/cli/commands/run.ts` - CLI command with --assign-only flag
 - `src/agents/base.ts` - Real MessageBus connection
 - `src/agents/communication.ts` - Message wrapping and payload extraction
-- `src/agents/planning.ts` - Planning work execution
+- `src/agents/planning.ts` - Planning work execution (PRD generation)
+- `src/agents/worker.ts` - Code generation implementation (auth-blocked)
+- `src/llm/AnthropicClient.ts` - Claude API integration (already existed)
 - `src/redis/client.ts` - pSubscribe parameter order fix
 
 ### Configuration
@@ -257,17 +420,19 @@ redis-cli
 
 ## 🎯 Next Milestone
 
-**Goal:** Self-hosting - Lemegeton implements PR-018 (Complexity Scoring) using PR-017 (Cost Controller)
+**Goal:** Self-hosting - Lemegeton implements a simple PR end-to-end
 
-**Blockers:**
-1. WorkerAgent needs real implementation
+**Critical Blocker:**
+1. **Authentication** - Resolve ANTHROPIC_API_KEY requirement (choose Option A, B, C, or D)
+
+**Additional Work Needed:**
 2. QCAgent needs test execution capability
-3. Planning output should be YAML for reliable parsing
+3. Git state synchronization
 
 **Success Criteria:**
-- `npx lemegeton run PR-018` completes successfully
+- `npx lemegeton run PR-XXX` completes successfully
 - Code is generated and passes tests
-- PR state transitions: new → planned → implementing → testing → done
+- PR state transitions: new → planned → implemented → testing → done
 - All work done by agents, no manual intervention
 
 ---
