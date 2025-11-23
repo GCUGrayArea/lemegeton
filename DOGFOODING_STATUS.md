@@ -1,7 +1,7 @@
 # Dogfooding Readiness Status
 
 **Branch:** `claude/evaluate-dogfooding-readiness-01GXB552UtQnG2fibXPVZdAz`
-**Last Updated:** 2025-11-22
+**Last Updated:** 2025-11-23
 **Goal:** Enable Lemegeton to work on its own task list
 
 ---
@@ -43,19 +43,54 @@ Successfully implemented the ability to run `npx lemegeton run <PR-ID>` in **in-
    - Updates PR state to 'planned' in Redis
    - Reports progress at each stage (25%, 50%, 75%, 100%)
 
+### Phase 1B: Daemon Mode Support
+
+Successfully implemented daemon mode for distributed/team scenarios.
+
+#### Key Implementations
+
+1. **Hub Daemon Work Request Handling** (`src/hub/index.ts`)
+   - Subscribes to `hub:work-requests` channel on startup
+   - Handles work requests from CLI clients
+   - Spawns agents and assigns work
+   - Sends responses on `hub:work-responses:{requestId}` channels
+   - Maps PR states to agent types (new→planning, planned→worker, etc.)
+
+2. **CLI Daemon Mode** (`src/cli/hubClient.ts`)
+   - `runInDaemonMode()` - Sends work requests to running hub daemon
+   - Auto-detects daemon via PID file
+   - Creates ephemeral MessageBus for request/response
+   - Supports timeout configuration
+   - Routes automatically based on daemon availability
+
+3. **Scheduler Integration** (`src/scheduler/index.ts`)
+   - Added `getPRNode()` method to expose dependency graph
+   - Scheduler initialized with task list from startup sequence
+
+4. **State Synchronization** (`src/hub/startup.ts`)
+   - Hub preserves Redis state across restarts
+   - Merges task-list.md with existing Redis state
+   - Redis state takes precedence for cold_state
+   - Scheduler initializes with current runtime states
+   - Prevents stale state issues
+
 #### Bug Fixes
 
 1. **TypeScript Compilation** - Installed missing `@types/node` package
 2. **Message Format Mismatch** - Fixed MessageBus publish/subscribe to use proper Message interface
 3. **Redis Data Access** - Fixed PlanningAgent to read from `state:prs` instead of individual `pr:{id}` keys
 4. **Dashboard JSON Parse Error** - Fixed `pSubscribe` callback parameter order (was receiving channel names as messages)
+5. **YAML Parse Error** - Fixed PR-015 estimated_minutes field with parenthetical note
+6. **Scheduler Not Initialized** - Fixed daemon mode to initialize scheduler with task list
+7. **State Overwrite** - Fixed hub startup to preserve Redis state instead of overwriting
 
 ---
 
 ## 🧪 Testing Status
 
-### Working Test Case
+### In-Process Mode Test Case
 ```bash
+# With hub daemon stopped
 npx lemegeton run PR-017
 ```
 
@@ -71,8 +106,27 @@ npx lemegeton run PR-017
 
 **Current Status:** ✅ **ALL WORKING**
 
+### Daemon Mode Test Case
+```bash
+# Start hub daemon
+npx lemegeton start
+
+# In another terminal
+npx lemegeton run PR-017
+```
+
+**Expected Behavior:**
+- Hub daemon receives work request
+- Spawns appropriate agent based on PR state (worker for 'planned' PRs)
+- Agent executes work
+- CLI receives completion response
+- Hub daemon stays running
+
+**Current Status:** ✅ **ALL WORKING**
+
 ### Known Issues
-- ⚠️ YAML parse warning in `task-list.md` (cosmetic, doesn't break functionality)
+- ⚠️ WorkerAgent.doWork() is stubbed (no real code generation yet)
+- ⚠️ QCAgent.doWork() is stubbed (no test execution yet)
 
 ---
 
@@ -80,46 +134,19 @@ npx lemegeton run PR-017
 
 ### High Priority
 
-1. **Fix YAML Parse Error in task-list.md**
-   - Status: In progress
-   - Impact: Cosmetic warning during startup
-
-2. **Change Planning Agent Output Format to YAML**
-   - Location: `src/agents/planning.ts` - `generatePlan()` method
-   - Current: Generates Markdown PRD files
-   - Needed: Generate structured YAML instead for easier parsing
-   - Rationale: Markdown is fragile and hard to parse reliably
-   - Example structure:
-     ```yaml
-     pr_id: PR-017
-     title: Cost Controller Implementation
-     complexity:
-       score: 6
-       estimated_minutes: 60
-     dependencies:
-       - PR-002
-       - PR-007
-     implementation_steps:
-       - Review dependencies
-       - Set up file structure
-       - Implement core functionality
-     estimated_files:
-       - path: src/cost/controller.ts
-         description: main cost controller
-     ```
-
-3. **Implement WorkerAgent.doWork()**
+1. **Implement WorkerAgent.doWork()**
    - Location: `src/agents/worker.ts`
    - Current: Stub implementation (simulation only)
    - Needed: Actual code implementation
    - Should:
      - Read PRD from `docs/plans/`
-     - Spawn Claude agent via API
+     - Use Claude API to generate code
      - Guide implementation with prompts from memory bank
      - Create/modify files based on plan
+     - Run build to verify TypeScript compiles
      - Update PR state to 'implemented'
 
-4. **Implement QCAgent.doWork()**
+2. **Implement QCAgent.doWork()**
    - Location: `src/agents/qc.ts`
    - Current: Stub implementation
    - Needed: Test execution and validation
@@ -128,41 +155,54 @@ npx lemegeton run PR-017
      - Parse test results
      - Report pass/fail status
      - Update PR state based on results
+     - Handle test failures gracefully
+
+3. **Change Planning Agent Output Format to YAML** (Optional Enhancement)
+   - Location: `src/agents/planning.ts` - `generatePlan()` method
+   - Current: Generates Markdown PRD files
+   - Optional: Generate structured YAML instead for easier parsing
+   - Rationale: Markdown is fragile and hard to parse reliably
+   - Note: Can defer until we see if WorkerAgent needs this
 
 ### Medium Priority
 
-5. **Daemon Mode Support**
-   - Location: `src/cli/hubClient.ts` - `runPR()` daemon path
-   - Current: Throws "Daemon mode not yet implemented"
-   - Needed: Send work to running hub daemon via IPC/MessageBus
-   - For team/distributed scenarios
-
-6. **State Synchronization**
+4. **Git State Synchronization**
    - Ensure PR state changes in Redis are synced back to `task-list.md`
    - Currently: Redis is updated but git file might drift
-   - Need bidirectional sync or clear source of truth
+   - Need git commit workflow when states change
+   - Consider: When to commit (after each PR? batched?)
 
-7. **Error Recovery**
-   - Agent crashes should update PR state
+5. **Error Recovery**
+   - Agent crashes should update PR state to 'failed'
    - Failed work should be reassignable
    - Timeout handling improvements
+   - Retry logic for transient failures
+
+6. **Claude API Integration**
+   - Set up API key configuration
+   - Implement rate limiting
+   - Handle API errors gracefully
+   - Support model selection (haiku/sonnet/opus)
 
 ### Low Priority
 
-8. **PRD Template Improvements**
+7. **PRD Template Improvements**
    - Add rationale sections
    - Include acceptance criteria
    - Reference related PRs/docs
+   - Add architectural decision records
 
-9. **Progress Reporting**
+8. **Progress Reporting**
    - More granular progress updates during work
    - Estimated time remaining
    - File-by-file progress for large PRs
+   - Live streaming of agent output
 
-10. **Cost Tracking Integration**
-    - Track API costs during agent work
-    - Enforce cost limits from PR complexity
-    - Report costs in work results
+9. **Cost Tracking Integration**
+   - Track API costs during agent work
+   - Enforce cost limits from PR complexity
+   - Report costs in work results
+   - Budget warnings and hard limits
 
 ---
 
