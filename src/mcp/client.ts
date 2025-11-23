@@ -19,9 +19,18 @@ import { MCPCache } from './cache';
 import { RetryManager } from './utils/retry';
 
 /**
+ * MCP Client operation mode
+ */
+export type MCPClientMode = 'production' | 'stub';
+
+/**
  * MCP Client for making requests to MCP servers
+ *
+ * NOTE: Currently running in stub mode by default as the MCP SDK
+ * has not been integrated yet. Set mode='production' when ready.
  */
 export class MCPClient extends EventEmitter {
+  private readonly mode: MCPClientMode;
   private config: MCPClientConfig;
   private cache: MCPCache;
   private retry: RetryManager;
@@ -30,14 +39,20 @@ export class MCPClient extends EventEmitter {
   private stats: MCPClientStats;
   private connected: boolean = false;
 
-  constructor(config: MCPClientConfig) {
+  constructor(config: MCPClientConfig, mode: MCPClientMode = 'stub') {
     super();
+    this.mode = mode;
     this.config = config;
     this.cache = new MCPCache(config.cache);
     this.retry = new RetryManager(config.retry);
     this.servers = new Map();
     this.serverHealth = new Map();
     this.stats = this.initializeStats();
+
+    // Warn if running in stub mode
+    if (this.mode === 'stub') {
+      console.warn('[MCPClient] Running in stub mode - MCP SDK not integrated. Real server communication disabled.');
+    }
 
     // Register servers
     for (const server of config.servers) {
@@ -50,6 +65,13 @@ export class MCPClient extends EventEmitter {
         });
       }
     }
+  }
+
+  /**
+   * Get the current operation mode
+   */
+  getMode(): MCPClientMode {
+    return this.mode;
   }
 
   /**
@@ -309,36 +331,46 @@ export class MCPClient extends EventEmitter {
    * Connect to a specific server
    */
   private async connectToServer(server: MCPServerConfig): Promise<void> {
-    // NOTE: This is a stub implementation
-    // In a real implementation, this would establish connection based on transport type
-    // For HTTP: verify server is reachable
-    // For stdio: spawn process and establish communication
-
-    if (server.transport === 'http') {
-      // For HTTP transport, we'll make a test request
-      // In production, this would use the MCP SDK
-      // For now, we just validate the URL
-      if (!server.url) {
-        throw new Error(`HTTP server ${server.name} requires a URL`);
-      }
-    } else if (server.transport === 'stdio') {
-      // For stdio transport, we would spawn a process
-      // For now, we just validate the command
-      if (!server.command) {
-        throw new Error(`stdio server ${server.name} requires a command`);
-      }
+    if (this.mode === 'stub') {
+      return this.connectToServerStub(server);
     }
+    return this.connectToServerProduction(server);
+  }
 
-    // Connection successful (stub)
+  /**
+   * Stub implementation of server connection
+   */
+  private async connectToServerStub(server: MCPServerConfig): Promise<void> {
+    // Validate configuration only
+    if (server.transport === 'http' && !server.url) {
+      throw new Error(`HTTP server ${server.name} requires a URL`);
+    }
+    if (server.transport === 'stdio' && !server.command) {
+      throw new Error(`stdio server ${server.name} requires a command`);
+    }
+    // Connection successful (stub - no actual connection)
     return Promise.resolve();
+  }
+
+  /**
+   * Production implementation of server connection
+   */
+  private async connectToServerProduction(server: MCPServerConfig): Promise<void> {
+    // TODO: Implement with MCP SDK
+    // For HTTP: establish connection and verify server is reachable
+    // For stdio: spawn process and establish communication
+    throw new Error('Production MCP connection not yet implemented - MCP SDK integration pending');
   }
 
   /**
    * Disconnect from a specific server
    */
   private async disconnectFromServer(server: MCPServerConfig): Promise<void> {
-    // Stub implementation
-    // In production: close HTTP connections or kill stdio processes
+    if (this.mode === 'stub') {
+      return Promise.resolve();
+    }
+    // TODO: Implement production disconnect with MCP SDK
+    // Close HTTP connections or kill stdio processes
     return Promise.resolve();
   }
 
@@ -349,13 +381,23 @@ export class MCPClient extends EventEmitter {
     server: MCPServerConfig,
     request: MCPRequest
   ): Promise<MCPResponse<T>> {
-    // NOTE: This is a stub implementation
-    // In production, this would use the MCP SDK to send actual requests
-    // For now, we return a mock response for testing
+    if (this.mode === 'stub') {
+      return this.sendRequestStub<T>(server, request);
+    }
+    return this.sendRequestProduction<T>(server, request);
+  }
 
+  /**
+   * Stub implementation of request sending
+   */
+  private async sendRequestStub<T>(
+    server: MCPServerConfig,
+    request: MCPRequest
+  ): Promise<MCPResponse<T>> {
     // Simulate network delay
     await new Promise(resolve => setTimeout(resolve, 100));
 
+    // Return mock response for testing
     return {
       content: {} as T,
       metadata: {
@@ -367,11 +409,26 @@ export class MCPClient extends EventEmitter {
   }
 
   /**
+   * Production implementation of request sending
+   */
+  private async sendRequestProduction<T>(
+    server: MCPServerConfig,
+    request: MCPRequest
+  ): Promise<MCPResponse<T>> {
+    // TODO: Implement with MCP SDK
+    // Use MCP SDK to send actual requests to servers
+    throw new Error('Production MCP requests not yet implemented - MCP SDK integration pending');
+  }
+
+  /**
    * List tools from a specific server
    */
   private async listServerTools(server: MCPServerConfig): Promise<MCPTool[]> {
-    // Stub implementation
-    // In production: use MCP SDK to list available tools
+    if (this.mode === 'stub') {
+      // Stub: return empty list
+      return [];
+    }
+    // TODO: Implement with MCP SDK to list available tools
     return [];
   }
 

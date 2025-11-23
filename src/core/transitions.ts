@@ -266,21 +266,28 @@ export function getAvailableTransitions(
 /**
  * Check if a transition requires a git commit.
  *
+ * Type predicate: Commits are required when transitioning TO a cold state.
+ * This aligns with the transition rules where:
+ * - COLD → COLD: requires_commit = true
+ * - HOT → COLD: requires_commit = true
+ * - HOT → HOT: requires_commit = false
+ * - COLD → HOT: requires_commit = false
+ *
  * @param from - Source state
  * @param to - Target state
- * @returns true if git commit should be triggered
+ * @returns true if git commit should be triggered (guarantees to is ColdState)
  */
 export function requiresCommit(
   from: HotState | ColdState,
   to: HotState | ColdState
-): boolean {
+): to is ColdState {
   // Same state = no commit needed
   if (from === to) {
     return false;
   }
 
-  const rule = getTransitionRule(from, to);
-  return rule?.requires_commit ?? false;
+  // Commits are required when target is a cold state
+  return isColdState(to);
 }
 
 /**

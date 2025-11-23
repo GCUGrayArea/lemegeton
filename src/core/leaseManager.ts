@@ -21,10 +21,13 @@ import {
   AtomicResult,
 } from './atomicOps';
 import {
-  expandWithPairedFiles,
   PairedLockingConfig,
   DEFAULT_PAIRED_LOCKING_CONFIG,
 } from './pairedLocking';
+import {
+  FileLockingStrategy,
+  createFileLockingStrategy,
+} from './fileLockingStrategy';
 import { mergeConfig } from '../utils/config';
 
 /**
@@ -101,6 +104,7 @@ export const DEFAULT_LEASE_MANAGER_CONFIG: Required<LeaseManagerConfig> = {
  */
 export class LeaseManager extends EventEmitter {
   private readonly config: Required<LeaseManagerConfig>;
+  private readonly lockingStrategy: FileLockingStrategy;
   private heartbeatTimers: Map<string, NodeJS.Timeout> = new Map();
   private agentLeases: Map<string, Set<string>> = new Map();
 
@@ -111,6 +115,9 @@ export class LeaseManager extends EventEmitter {
     super();
 
     this.config = mergeConfig(DEFAULT_LEASE_MANAGER_CONFIG, config);
+
+    // Initialize file locking strategy based on configuration
+    this.lockingStrategy = createFileLockingStrategy(this.config.pairedLocking);
   }
 
   /**
@@ -142,19 +149,10 @@ export class LeaseManager extends EventEmitter {
     const leaseTTL = ttl ?? this.config.defaultTTL;
 
     try {
-      // Expand files with paired files if enabled
-      let allFiles = files;
-      let expanded = false;
-
-      if (this.config.pairedLocking.enabled) {
-        const paired = await expandWithPairedFiles(
-          files,
-          this.config.pairedLocking.patterns,
-          this.config.pairedLocking.checkExists
-        );
-        allFiles = paired.all;
-        expanded = paired.all.length > files.length;
-      }
+      // Expand files using the configured locking strategy
+      const expansionResult = await this.lockingStrategy.expandFiles(files);
+      const allFiles = expansionResult.all;
+      const expanded = expansionResult.expanded;
 
       // Check for existing leases
       const conflicts = await this.checkConflicts(allFiles, agentId);

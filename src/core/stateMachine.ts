@@ -243,28 +243,10 @@ export class StateMachine {
     }
 
     // Trigger git commit if needed
+    // Type predicate ensures toState is ColdState when needsCommit is true
     if (needsCommit && this.gitCommitter) {
-      // Verify toState is actually a cold state (type-safe runtime check)
-      if (!isColdState(toState)) {
-        const stateError = StateError.invalidState(toState, {
-          pr_id: prId,
-          from_state: fromState,
-          to_state: toState,
-          reason: 'needsCommit requires cold state',
-          agent_id: agentId,
-        });
-        console.error(`[StateMachine] ${stateError.message}`);
-        return {
-          success: false,
-          new_state: fromState,
-          error: stateError.message,
-          committed: false,
-          transition
-        };
-      }
-
       try {
-        // TypeScript now knows toState is ColdState
+        // TypeScript knows toState is ColdState here due to type predicate
         const commitMessage = this.generateCommitMessage(prId, fromState, toState, reason);
         const metadata: CommitMetadata = {
           pr_id: prId,
