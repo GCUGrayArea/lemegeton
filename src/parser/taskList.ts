@@ -111,7 +111,6 @@ export class TaskListParser {
 
     // Invalidate cache
     this.cache.delete(filePath);
-    this.cacheTimestamps.delete(filePath);
   }
 
   /**
@@ -146,7 +145,6 @@ export class TaskListParser {
 
     // Invalidate cache
     this.cache.delete(filePath);
-    this.cacheTimestamps.delete(filePath);
   }
 
   /**
@@ -161,7 +159,6 @@ export class TaskListParser {
    */
   clearCache(): void {
     this.cache.clear();
-    this.cacheTimestamps.clear();
   }
 
   /**

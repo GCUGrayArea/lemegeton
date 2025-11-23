@@ -52,7 +52,9 @@ export class RedisClient extends EventEmitter {
   private reconnectTimer: NodeJS.Timeout | null = null;
   private isClosing = false;
 
-  constructor(private readonly url?: string) {
+  private readonly url: string;
+
+  constructor(url?: string) {
     super();
     this.url = url || getRedisUrl();
   }

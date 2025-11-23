@@ -51,10 +51,10 @@ export function mergeConfig<T extends Record<string, any>>(
       typeof defaultValue === 'object' &&
       !Array.isArray(defaultValue)
     ) {
-      result[key] = mergeConfig(defaultValue, override);
+      result[key] = mergeConfig(defaultValue, override) as T[Extract<keyof T, string>];
     } else {
       // Direct assignment for primitives, arrays, null, etc.
-      result[key] = override;
+      result[key] = override as T[Extract<keyof T, string>];
     }
   }
 
@@ -111,7 +111,7 @@ export function validateConfigKeys<T extends Record<string, any>>(
     // Recursively validate nested objects
     if (isPlainObject(override) && isPlainObject(defaultValue)) {
       invalidKeys.push(
-        ...validateConfigKeys(defaultValue, override, currentPath)
+        ...validateConfigKeys(defaultValue as Record<string, any>, override as Record<string, any>, currentPath)
       );
     }
   }
